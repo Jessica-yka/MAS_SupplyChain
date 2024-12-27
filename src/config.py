@@ -117,3 +117,4 @@ env_configs = {
         'stage_names': ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
     },
 }
+
