@@ -109,5 +109,22 @@ def random_relations(n_cand: int, n_relation: int):
     return np.random.choice(a=np.arange(n_cand), p=n_relation, replace=False)
 
 def generate_lead_time(num_data: int, lb=2, ub=8):
+    # To generate lead time for each agent
+    return np.random.uniform(low=lb, high=ub, size=num_data)
+
+def generate_prod_capacity(num_data: int, lb=20, ub=40):
+    # To generate production capacity for each agent
+    return np.random.uniform(low=lb, high=ub, size=num_data)
+
+def generate_profit_rate(num_data: int, lb=0, ub=1):
+    # To generate profit rate for agents to decide price based on cost
+    return np.random.uniform(low=lb, high=ub, size=num_data)
+
+def generate_price_for_manufacturers(num_manufactureres: int, lb=10, ub=20):
+    # To generate selling price for manufacturers
+    # The selling prices of other agents are subject to the order costs
+    np.random.uniform(low=lb, high=ub, size=num_manufactureres)
+
+def generate_cost(num_data: int, lb=10, ub=20):
 
     return np.random.uniform(low=lb, high=ub, size=num_data)
