@@ -215,7 +215,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         for m in range(self.num_stages):
             for x in range(self.num_agents_per_stage):
                 states[m, x, 9: 9+self.num_agents_per_stage] = self.supply_relations[m][x]
-                states[m, x, 9+self.num_agents_per_stage: 9+2*self.num_agents_per_stage] = self.demand_relations[m][x]
+                # states[m, x, 9+self.num_agents_per_stage: 9+2*self.num_agents_per_stage] = self.demand_relations[m][x]
 
 
         lt_max = self.max_lead_time
@@ -255,7 +255,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         current_inventories = self.inventories[:, :, t - 1]
         self.orders[:, :, t] = np.array([action_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage)
         self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
-        self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
+        # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         
         self.demands[t] = int(self.demand_fn(t))
 
@@ -403,9 +403,9 @@ if __name__ == '__main__':
         for m in range(im_env.num_stages):
             for x in range(im_env.num_agents_per_stage):
                 sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                sup_dict[f"stage_{m}_agent_{x}"][(x+1)%4] = 1
+                sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%4] = 1
                 dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                dem_dict[f"stage_{m}_agent_{x}"][(x+1)%4] = 1
+                dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%4] = 1
         print("sup_dict", sup_dict)
 
         next_state_dict, rewards, terminations, truncations, infos = im_env.step(

@@ -21,31 +21,33 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
         stage_agents = []
         for x in range(num_agents_per_stage):
             stage_agents.append(f"s{m}a{x}")
-        print(stage_agents)
-        M.add_nodes_from(stage_agents, bipartite=m)  # Add set A nodes
+        M.add_nodes_from(stage_agents, layer=num_stages-m)  # Add set A nodes
 
 
     # Add edges between the sets
     edges = []
-    for m in range(num_stages):
+    for m in range(num_stages-1):
         for x in range(num_agents_per_stage):
-            for i in sup_rel[m][x]:
-                if i == 1:
+            for i in range(num_agents_per_stage):
+                if sup_rel[m][x][i] == 1:
                     src = f"s{m+1}a{i}"
                     tgt = f"s{m}a{x}"
                     edges.append((src, tgt))
 
     M.add_edges_from(edges)
-    # print(M.nodes)
-    # print(M.edges)
+
     # Define positions for the multipartite layout
-    pos = nx.multipartite_layout(M, subset_key="bipartite")
+    pos = nx.multipartite_layout(M, subset_key="layer")
 
     # Draw the multipartite graph
-    plt.figure(figsize=(10, 6))
-    nx.draw(M, pos, with_labels=True, node_color="skyblue", node_size=1500, font_size=12, edge_color="gray")
+    # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
+    stage_colors = ["gold", "violet", "limegreen", "darkorange",]
+    colors = [stage_colors[m] for m in range(num_stages) for x in range(num_agents_per_stage)]
+
+    plt.figure(figsize=(10, 8))
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=2500, font_size=12, edge_color="gray", alpha=1)
     plt.title("Multipartite Graph")
-    plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="png")
+    plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="jpg")
 
 
 def visualize_state(env, rewards: dict, t: int, save_prefix: str):
@@ -106,3 +108,6 @@ def random_relations(n_cand: int, n_relation: int):
 
     return np.random.choice(a=np.arange(n_cand), p=n_relation, replace=False)
 
+def generate_lead_time(num_data: int, lb=2, ub=8):
+
+    return np.random.uniform(low=lb, high=ub, size=num_data)

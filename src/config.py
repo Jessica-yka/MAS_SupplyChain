@@ -7,9 +7,9 @@ from utils import random_relations
 np.random.seed(0)
 
 num_stages = 4
-num_agents_per_stage = 4
+num_agents_per_stage = 3
 num_total_agents = num_stages * num_agents_per_stage
-num_periods = 12
+num_periods = 1
 stage_names = ['retailer', 'wholesaler', 'distributor', 'manufacturer']
 supply_relations = {} # who are my suppliers
 demand_relations = {} # who are my customers
@@ -34,20 +34,6 @@ for m in range(num_stages):
 
 
 env_configs = {
-    'two_agent': {
-        'num_stages': 2,
-        'num_agents_per_stage': 2, 
-        'num_periods': 2,
-        'init_inventories': [4 for _ in range(4)],
-        'lead_times': [1, 2, 3, 4],
-        'demand_fn': lambda t: 4,
-        'prod_capacities': [10 for _ in range(4)],
-        'sale_prices': [0 for _ in range(4)],
-        'order_costs': [0 for _ in range(4)],
-        'backlog_costs': [1 for _ in range(4)],
-        'holding_costs': [1 for _ in range(4)],
-        'stage_names': ['retailer', 'supplier'],
-    },
     'constant_demand': {
         'num_stages': num_stages,
         'num_periods': num_periods,
@@ -63,6 +49,20 @@ env_configs = {
         'supply_relations': supply_relations,
         "demand_relations": demand_relations,
         'stage_names': stage_names,
+    },
+    'two_agent': {
+        'num_stages': 2,
+        'num_agents_per_stage': 2, 
+        'num_periods': 2,
+        'init_inventories': [4 for _ in range(4)],
+        'lead_times': [1, 2, 3, 4],
+        'demand_fn': lambda t: 4,
+        'prod_capacities': [10 for _ in range(4)],
+        'sale_prices': [0 for _ in range(4)],
+        'order_costs': [0 for _ in range(4)],
+        'backlog_costs': [1 for _ in range(4)],
+        'holding_costs': [1 for _ in range(4)],
+        'stage_names': ['retailer', 'supplier'],
     },
     'variable_demand': {
         'num_stages': 4,
