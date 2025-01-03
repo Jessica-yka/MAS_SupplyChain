@@ -4,6 +4,20 @@ import os
 import networkx as nx
 import matplotlib.pyplot as plt
 
+def convert_to_dict(input_string):
+    # Remove unwanted characters and split the string
+    input_string = input_string.replace('(', '').replace(')', '')
+    pairs = input_string.split(', ')
+    
+    result_dict = {}
+    
+    for pair in pairs:
+        # Split each pair into key and value
+        key, value = pair.split(': ')
+        result_dict[key.strip().strip('\"')] = int(value.strip())
+        
+    return result_dict
+
 # Create a multipartite graph
 def draw_multipartite_graph(env, t: int, save_prefix: str):
 
@@ -108,23 +122,155 @@ def random_relations(n_cand: int, n_relation: int):
 
     return np.random.choice(a=np.arange(n_cand), p=n_relation, replace=False)
 
-def generate_lead_time(num_data: int, lb=2, ub=8):
+def generate_lead_time(dist: str, num_data: int, lb=2, ub=8):
     # To generate lead time for each agent
-    return np.random.uniform(low=lb, high=ub, size=num_data)
+    if dist == 'uniform':
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist == "constant":
+        mean = (lb + ub)//2
+        return [mean for _ in range(num_data)]
+    else:
+        raise AssertionError("Lead time function is not implemented.")
 
-def generate_prod_capacity(num_data: int, lb=20, ub=40):
+
+def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40):
     # To generate production capacity for each agent
-    return np.random.uniform(low=lb, high=ub, size=num_data)
+    if dist == 'uniform':
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist == 'constant':
+        mean = (lb + ub)//2
+        return [mean for _ in range(num_data)]
+    else:
+        raise AssertionError("Prod capacity function is not implemented.")
 
-def generate_profit_rate(num_data: int, lb=0, ub=1):
+
+def generate_profit_rate(dist: str, num_data: int, lb=0, ub=1):
     # To generate profit rate for agents to decide price based on cost
-    return np.random.uniform(low=lb, high=ub, size=num_data)
+    if dist == "uniform":
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist == 'constant':
+        mean = (lb + ub)//2
+        return [mean for _ in range(num_data)]
+    else:
+        raise AssertionError("Profit rate function is not implemented.")
 
-def generate_price_for_manufacturers(num_manufactureres: int, lb=10, ub=20):
-    # To generate selling price for manufacturers
-    # The selling prices of other agents are subject to the order costs
-    np.random.uniform(low=lb, high=ub, size=num_manufactureres)
 
-def generate_cost(num_data: int, lb=10, ub=20):
+def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20):
 
-    return np.random.uniform(low=lb, high=ub, size=num_data)
+    if dist == "uniform":
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist == "constant":
+        mean = (lb + ub)//2
+        return [mean for _ in range(num_data)]
+    else:
+        raise AssertionError("Prod cost function is not implemented.")
+
+
+def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int):
+
+    # price = total cost * profit rate
+    # cost = order cost + production cost
+    num_total_agents = num_stages * num_agents_per_stage
+
+    all_profit_rate = generate_profit_rate(dist=dist, num_data=num_total_agents)
+    all_prod_costs = generate_prod_cost(dist=dist, num_data=num_total_agents)
+
+    all_sale_prices = []
+    all_total_costs = []
+
+    manu_prices = all_prod_costs[:num_agents_per_stage] * all_profit_rate[:num_agents_per_stage]
+    all_sale_prices += manu_prices # add prices of manufacturers to the price list
+    all_total_costs += all_prod_costs[:num_agents_per_stage] # add cost of manufacturers to the cost list
+    for i in range(1, num_stages):
+        order_costs = all_sale_prices[-num_agents_per_stage:]
+        prod_costs = all_prod_costs[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
+        profit_rate = all_profit_rate[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
+        downstream_prices = (order_costs + prod_costs) * profit_rate
+
+        all_sale_prices += downstream_prices
+    
+    return all_total_costs, all_sale_prices
+
+
+def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage: int):
+
+    if type == "single":
+        supply_relations = {} # who are my suppliers
+        demand_relations = {} # who are my customers
+        for m in range(num_stages):
+            supply_relations[m] = dict()
+            demand_relations[m] = dict()
+            for x in range(num_agents_per_stage):
+                if m == 0: 
+                    supply_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) 
+                    supply_relations[m][x][x] = 1
+                    demand_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) # retailers have no downstream company
+                elif m == num_stages-1: 
+                    supply_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) # manufacturers have no upstream company
+                    demand_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int)
+                    demand_relations[m][x][x] = 1
+                else:
+                    supply_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int)
+                    supply_relations[m][x][x] = 1
+                    demand_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int)
+                    demand_relations[m][x][x] = 1
+    else:
+        raise AssertionError("Relation function is not implemented.")
+    
+
+def generate_holding_costs(dist: str, num_data: int, lb: int=1, ub: int=5):
+
+    if dist == 'constant':
+        mean = (lb + ub)//2
+        return [mean for _ in range(num_data)]
+    elif dist == "uniform":
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    else:
+        raise AssertionError("holding function is not implemented.")
+
+
+def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5):
+
+    if dist == 'constant':
+        mean = (lb + ub)//2
+        return [mean for _ in range(num_data)]
+    elif dist == "uniform":
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    else:
+        raise AssertionError("backlog function is not implemented.")
+    
+
+def generate_init_inventories(dist: str, num_data: int, lb: int=10, ub: int=18):
+
+    if dist == "constant":
+        mean = (lb+ub)//2
+        return [mean for _ in range(num_data)]
+    elif dist == 'uniform':
+        return np.random.uniform(low=lb, high=ub, size=num_data)
+    else:
+        raise AssertionError("init inventories is not implemented")
+    
+
+    
+
+class Demand_fn:
+
+    def __init__(self, dist: str, lb: int=2, ub: int=8, mean: int=4):
+        self.dist = dist
+        self.lb = lb
+        self.ub = ub
+        self.mean = mean
+        self.period = -1
+
+    def constant_demand(self):
+        return self.mean
+
+    def uniform_demand(self):
+        return np.random.randint(low=self.lb, high=self.ub)
+    
+    def forward(self, t):
+        self.period = t
+        if self.dist == 'constant':
+            return self.constant_demand()
+        elif self.dist == "uniform":
+            return self.uniform_demand()

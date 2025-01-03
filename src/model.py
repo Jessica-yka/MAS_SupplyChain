@@ -7,6 +7,8 @@ from typing import List
 from tqdm.notebook import tqdm
 from autogen import ConversableAgent
 from llm_config import llm_config_list
+from utils import convert_to_dict
+
 
 
 def get_state_description(state):
@@ -102,7 +104,7 @@ def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
                     "Task2: Do you want to add any upstream suppliers?\n\n"
                     "Please state your reason in 1-2 sentences first "
                     "and then provide your action as a list (e.g. [2, 3] for adding agent2 and agent3 as suppliers, [] for doing nothing)\n"
-                    "Task3: What is your action (order quantity) for this round?\n\n"
+                    "Task3: What is the order quantity you would like to place with each supplier for this round?\n\n"
                     "Golden rule of this game: Open orders should always equal to \"expected downstream orders + backlog\". "
                     "If open orders are larger than this, the inventory will rise (once the open orders arrive). "
                     "If open orders are smaller than this, the backlog will not go down and it may even rise. "
@@ -112,7 +114,7 @@ def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
                     "Try to spread your orders over multiple rounds to prevent the bullwhip effect. "
                     "Anticipate future demand changes and adjust your orders accordingly to maintain a stable inventory level.\n\n"
                     "Please state your reason in 1-2 sentences first "
-                    "and then provide your action as a non-negative integer within brackets (e.g. [0])."
+                    "and then provide your order as supplier-order pair in a list (e.g. [(\"agent0\": 4), (\"agent1\": 2)])."
                 )
 
                 chat_result = user_proxy.initiate_chat(
@@ -146,16 +148,18 @@ def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
                 #     stage_action = int(match.group(1))
                 # else:
                 #     stage_action = 0
-                stage_order_action = 0
+                stage_order_action = np.zeros(num_agents_per_stage, type=int)
                 if not match[2]:
-                    stage_order_action = int(match[2])
+                    supplier_order_dict = convert_to_dict(match[2])
+                    for i in range(num_agents_per_stage):
+                        stage_order_action[i] = supplier_order_dict[f"agent{i}"]
                 action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
 
                 print("action sup action", sup_action)
                 print("action order action", stage_order_action)
             
             
-        next_states, rewards, terminations, truncations, infos = im_env.step(action_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict)
+        next_states, rewards, terminations, truncations, infos = im_env.step(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict)
         next_state_dict = im_env.parse_state(next_states)
         all_state_dicts[period + 1] = next_state_dict
         all_action_order_dicts[period + 1] = action_order_dict

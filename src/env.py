@@ -236,16 +236,16 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.state_dict = {f"stage_{m}_agent_{x}": states[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
 
 
-    def step(self, action_dict: dict[str, int], sup_dict: dict[str, list], dem_dict: dict[str, list]) -> tuple[dict, dict, dict, dict, dict]:
+    def step(self, order_dict: dict[str, int], sup_dict: dict[str, list], dem_dict: dict[str, list]) -> tuple[dict, dict, dict, dict, dict]:
         """
         Take a step and return the next observation
 
         :param action_dict: action (order quantity) for each stage
         :return: states, rewards, terminations, truncations, infos
         """
-        assert all(f"stage_{m}_agent_{x}" in action_dict for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
+        assert all(f"stage_{m}_agent_{x}" in order_dict for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
             "Order quantities for all stages are required."
-        assert all(action_dict[f"stage_{m}_agent_{x}"] >= 0 for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
+        assert all(order_dict[f"stage_{m}_agent_{x}"] >= 0 for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
             "Order quantities must be non-negative integers."
 
         # Get the inventory at the beginning of the period
@@ -253,7 +253,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         t = self.period
         M = self.num_stages
         current_inventories = self.inventories[:, :, t - 1]
-        self.orders[:, :, t] = np.array([action_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage)
+        self.orders[:, :, t] = np.array([order_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         
