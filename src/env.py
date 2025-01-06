@@ -199,7 +199,7 @@ class InventoryManagementEnv(MultiAgentEnv):
     def update_state(self) -> None:
         """
         Update the environment state including the current stage features, inventory, backlog, upstream backlog,
-        previous sales, arriving deliveries, supply relations and demand relations
+        supply relations, demand relations, previous sales, arriving deliveries, 
 
         State: s_{m,x,t} = [c_m_x, p_m_x, r_m_x, k_m_x, h_m_x, L_m_x, I_{m,x,t-1}, B_{m,x,t-1}, B_{m+1,x,t-1},
         sup_rel, dem_rel, S_{m,x,t-L_max}, ..., S_{m,x,t-1}, 0, ..., 0, R_{m,x,t-L_m}, ..., R_{m,x,t-1}]

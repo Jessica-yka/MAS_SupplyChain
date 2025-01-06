@@ -12,6 +12,7 @@ np.random.seed(0)
 
 env_configs = {
     "basic": {
+        "config_name": "basic",
         "sup_dem_relation_type": "single", # single/multiple
         "num_agents_per_stage": 3, # >= 2
         "num_periods": 1, 
@@ -34,13 +35,20 @@ def get_env_configs(env_configs: dict):
     num_periods = env_configs["num_periods"]
     num_total_agents = num_stages * num_agents_per_stage
     
-    supply_relations, demand_relations = generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage)
-    sale_prices, order_costs = generate_cost_price(dist=env_configs["price_cost_dist"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage)
-    holding_costs = generate_holding_costs(dist=env_configs["holding_costs_dist"], num_data=num_total_agents)
-    backlog_costs = generate_backlog_costs(dist=env_configs["backlog_costs_dist"], num_data=num_total_agents)
-    lead_times = generate_lead_time(dist=env_configs["lead_time_dist"], num_data=num_total_agents)
-    prod_capacities = generate_prod_capacity(dist=env_configs['prod_capacity_dist'], num_data=num_total_agents)
-    init_inventories = generate_init_inventories(dist=env_configs["init_inventory_dist"], num_data=num_total_agents)
+    supply_relations, demand_relations = \
+        generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=env_configs["config_name"])
+    sale_prices, order_costs = \
+        generate_cost_price(dist=env_configs["price_cost_dist"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=env_configs["config_name"])
+    holding_costs = \
+        generate_holding_costs(dist=env_configs["holding_costs_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
+    backlog_costs = \
+        generate_backlog_costs(dist=env_configs["backlog_costs_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
+    lead_times = \
+        generate_lead_time(dist=env_configs["lead_time_dist"], num_data=num_total_agents, num_agents_per_stage=num_agents_per_stage,config_name=env_configs["config_name"])
+    prod_capacities = \
+        generate_prod_capacity(dist=env_configs['prod_capacity_dist'], num_data=num_total_agents, config_name=env_configs["config_name"])
+    init_inventories = \
+        generate_init_inventories(dist=env_configs["init_inventory_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     demand_fn = Demand_fn(dist=env_configs["demand_fn"])
     stage_names = env_configs["stage_names"]
 

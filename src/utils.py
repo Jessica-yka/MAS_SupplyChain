@@ -4,6 +4,10 @@ import os
 import networkx as nx
 import matplotlib.pyplot as plt
 
+def save_array(data: np.ndarray, save_path: str):
+    print("Saving data to: ", save_path)
+    np.save(save_path, data)
+
 def convert_to_dict(input_string):
     # Remove unwanted characters and split the string
     input_string = input_string.replace('(', '').replace(')', '')
@@ -122,51 +126,59 @@ def random_relations(n_cand: int, n_relation: int):
 
     return np.random.choice(a=np.arange(n_cand), p=n_relation, replace=False)
 
-def generate_lead_time(dist: str, num_data: int, lb=2, ub=8):
+def generate_lead_time(dist: str, num_data: int, num_agents_per_stage: int, lb=2, ub=8, config_name: str="test"):
     # To generate lead time for each agent
     if dist == 'uniform':
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=(num_data, num_agents_per_stage))
     elif dist == "constant":
         mean = (lb + ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     else:
         raise AssertionError("Lead time function is not implemented.")
+    save_array(data, f"../results/{config_name}/lead_time.npy")
+    return data
 
-
-def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40):
+def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, config_name: str="test"):
     # To generate production capacity for each agent
     if dist == 'uniform':
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
     elif dist == 'constant':
         mean = (lb + ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     else:
         raise AssertionError("Prod capacity function is not implemented.")
+    
+    save_array(data, f"../results/{config_name}/prod_capacity.npy")
+    return data
 
 
-def generate_profit_rate(dist: str, num_data: int, lb=0, ub=1):
+def generate_profit_rate(dist: str, num_data: int, lb=0, ub=1, config_name: str="test"):
     # To generate profit rate for agents to decide price based on cost
     if dist == "uniform":
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
     elif dist == 'constant':
         mean = (lb + ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     else:
         raise AssertionError("Profit rate function is not implemented.")
+    
+    save_array(data, f"../results/{config_name}/profit_rate.npy")
+    return data
 
-
-def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20):
+def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20, config_name: str="test"):
 
     if dist == "uniform":
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
     elif dist == "constant":
         mean = (lb + ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     else:
         raise AssertionError("Prod cost function is not implemented.")
+    
+    save_array(data, f"../results/{config_name}/prod_cost.npy")
+    return data
 
-
-def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int):
+def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, config_name: str="test"):
 
     # price = total cost * profit rate
     # cost = order cost + production cost
@@ -189,6 +201,8 @@ def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int):
 
         all_sale_prices += downstream_prices
     
+    save_array(all_sale_prices, f"../results/{config_name}/sale_prices.npy")
+    save_array(all_total_costs, f"../results/{config_name}/total_costs.npy")
     return all_total_costs, all_sale_prices
 
 
@@ -218,38 +232,46 @@ def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage:
         raise AssertionError("Relation function is not implemented.")
     
 
-def generate_holding_costs(dist: str, num_data: int, lb: int=1, ub: int=5):
+def generate_holding_costs(dist: str, num_data: int, lb: int=1, ub: int=5, config_name: str="test"):
 
     if dist == 'constant':
         mean = (lb + ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     elif dist == "uniform":
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
     else:
         raise AssertionError("holding function is not implemented.")
 
+    save_array(data, f"../results/{config_name}/holding_costs.npy")
+    return data
 
-def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5):
+
+def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5, config_name: str="test"):
 
     if dist == 'constant':
         mean = (lb + ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     elif dist == "uniform":
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
     else:
         raise AssertionError("backlog function is not implemented.")
     
+    save_array(data, f"../results/{config_name}/backlog_costs.npy")
+    return data
+    
 
-def generate_init_inventories(dist: str, num_data: int, lb: int=10, ub: int=18):
+def generate_init_inventories(dist: str, num_data: int, lb: int=10, ub: int=18, config_name: str="test"):
 
     if dist == "constant":
         mean = (lb+ub)//2
-        return [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_data)]
     elif dist == 'uniform':
-        return np.random.uniform(low=lb, high=ub, size=num_data)
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
     else:
         raise AssertionError("init inventories is not implemented")
     
+    save_array(data, f"../results/{config_name}/init_inventories.npy")
+    return data
 
     
 
