@@ -11,7 +11,7 @@ import numpy as np
 from gymnasium import spaces
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
-from config import env_configs
+from config import env_configs, get_env_configs
 
 from utils import visualize_state, parse_stage_agent_id
 
@@ -120,7 +120,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.period = 0
         self.inventories = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.orders = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
-        self.arriving_orders = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
+        self.arriving_orders = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.sales = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.backlogs = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.demands = np.zeros(self.num_periods + 1, dtype=int)
@@ -212,15 +212,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         S_{m,x,t-L_max}, ..., S_{m,x,t-1}, 0, ..., 0, R_{m,x,t-L_m}, ..., R_{m,x,t-1}]
         """
         t = self.period
-        # 9 single value features + 2 relation features + previous sales + arriving orders
-        # states = np.zeros((self.num_stages, self.num_agents_per_stage, 8 + self.num_agents_per_stage + 2*self.num_agents_per_stage + 2 * self.max_lead_time), dtype=int)
         states = dict()
-        # lead time is removed for consistent shape
-        # states[:, :, :7] = np.stack([
-        #     self.prod_capacities, self.sale_prices, self.order_costs, self.backlog_costs, self.holding_costs,
-        #     self.inventories[:, :, t], self.backlogs[:, :, t]], axis=-1)
-        # states[:-1, :, 7] = self.backlogs[1:, :, t]
-
         states["prod_capacities"] = self.prod_capacities
         states["sale_prices"] = self.sale_prices
         states["order_costs"] = self.order_costs
@@ -234,38 +226,13 @@ class InventoryManagementEnv(MultiAgentEnv):
         states["suppliers"] = self.supply_relations
         states["customers"] = self.demand_relations
 
-        # for m in range(self.num_stages):
-        #     for x in range(self.num_agents_per_stage):
-        #         states[m, x, 8: 8+self.num_agents_per_stage] = self.supply_relations[m][x]
-                # states[m, x, 8+self.num_agents_per_stage: 8+2*self.num_agents_per_stage] = self.demand_relations[m][x]
-                
-
-        # for m in range(self.num_stages):
-        #     for x in range(self.num_agents_per_stage):
-        #         states[m, x, 8+2*self.num_agents_per_stage: 8+3*self.num_agents_per_stage] = self.lead_times[m][x]
-        
-
         lt_max = self.max_lead_time
-        # if t >= lt_max:
-        #     states[:, :, (-2 * lt_max):-lt_max] = self.sales[:, :, (t - lt_max + 1):(t + 1)]
-        # elif t > 0:
-        #     states[:, :, (-lt_max - t):-lt_max] = self.sales[:, :, 1:(t + 1)]
-
         states["recent_sales"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, lt_max), dtype=int)
         if t >= lt_max:
             states["recent_sales"][:, :, (-2 * lt_max):-lt_max] = self.sales[:, :, (t - lt_max + 1):(t + 1)]
         elif t > 0:
             states["recent_sales"][:, :, (-lt_max - t):-lt_max] = self.sales[:, :, 1:(t + 1)]
 
-        # for m in range(self.num_stages):
-        #     for x in range(self.num_agents_per_stage):
-        #         for j in range(self.num_agents_per_stage):
-        #             if self.supply_relations[m][x][j] == 1:
-        #                 lt = self.lead_times[m][x][j]
-        #                 if t >= lt:
-        #                     states[m, x, -lt:] += self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
-        #                 elif t > 0:
-        #                     states[m, x, -t:] += self.arriving_orders[m, x, j, 1:(t + 1)]
         states["arriving_deliveries"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, lt_max), dtype=int)
         for m in range(self.num_stages):
             for x in range(self.num_agents_per_stage):
@@ -297,6 +264,7 @@ class InventoryManagementEnv(MultiAgentEnv):
                 agent_state.append(states["arriving_deliveries"][m][x])
 
                 self.state_dict[f"stage_{m}_agent_{x}"] = agent_state
+
         return self.state_dict
 
     def step(self, order_dict: dict[str, int], sup_dict: dict[str, list], dem_dict: dict[str, list]) -> tuple[dict, dict, dict, dict, dict]:
@@ -308,7 +276,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         """
         assert np.all(f"stage_{m}_agent_{x}" in order_dict for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
             "Order quantities for all stages are required."
-        print(order_dict["stage_0_agent_0"])
         assert np.all(order_dict[f"stage_{m}_agent_{x}"] >= 0 for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
             "Order quantities must be non-negative integers."
 
@@ -317,7 +284,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         t = self.period
         M = self.num_stages
         current_inventories = self.inventories[:, :, t - 1]
-        self.orders[:, :, :, t] = np.array([order_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
+        self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         
@@ -335,14 +302,18 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         # Compute the fulfilled orders
         # R_{m,t} = min(B_{m+1,t-1} + O_{m,t}, I_{m+1,t-1} + R_{m+1,t-L_{m+1}}, c_{m+1}), m = 0, ..., M - 2
-        cum_orders = np.sum(self.orders, axis=2)
-        print("shape of cum orders", cum_orders.shape)
-        self.arriving_orders[:-1, :, :, t] = np.minimum(
+        cum_orders = np.sum(self.orders, axis=1)
+        print("cum orders\n", cum_orders)
+        print("orders\n", self.orders[:-1, :, :, t])
+        print("backlogs\n", self.backlogs[1:, :, t - 1])
+        print("current inventories\n", current_inventories[1:])
+        self.arriving_orders[:-1, :, t] = np.minimum(
             np.minimum(self.backlogs[1:, :, t - 1] + cum_orders[:-1, :, t], current_inventories[1:]),
             self.prod_capacities[1:])
         # R_{M-1,t} = O_{M-1,t}
         self.arriving_orders[M - 1, :, t] = cum_orders[M - 1, :, t] # the manufacturers at the top of supply chain
-
+        print("arriving orders\n", self.arriving_orders[:, :, t])
+        exit()
         # Compute the sales
         cum_arriving_orders = np.sum(self.arriving_orders, axis=2)
         # S_{m,t} = R_{m-1,t}, m = 1, ..., M - 1
@@ -365,7 +336,10 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         # Compute the profits
         # P_{m,t} = p_m S_{m,t} - r_m R_{m,t} - k_m B_{m,t} - h_m I_{m,t}
-        self.profits[:, :, t] = self.sale_prices * self.sales[:, :, t] - self.order_costs * self.arriving_orders[:, :, t] \
+        print("order costs", self.order_costs)
+        print("arriving orders", self.arriving_orders[:, :, :, t])
+        exit()
+        self.profits[:, :, t] = self.sale_prices * self.sales[:, :, t] - self.order_costs * self.arriving_orders[:, :, :, t] \
                              - self.backlog_costs * self.backlogs[:, :, t] - self.holding_costs * self.inventories[:, :, t] \
         
 
@@ -455,7 +429,8 @@ def env_creator(env_config):
 
 if __name__ == '__main__':
 
-    im_env = env_creator(env_configs['constant_demand'])
+    ec = get_env_configs(env_configs['basic'])
+    im_env = env_creator(env_config=ec)
     im_env.reset()
     print(f"stage_names = {im_env.stage_names}")
     print(f"state_dict = {im_env.state_dict}")
@@ -467,6 +442,7 @@ if __name__ == '__main__':
     print(f"action_supply_space = {im_env.action_supply_space}")
     print(f"action_demand_space = {im_env.action_demand_space}")
     visualize_state(env=im_env, rewards={}, t=-1, save_prefix="test")
+    num_agents_per_stage = im_env.num_agents_per_stage
 
     for t in range(im_env.num_periods):
         print("period", t)
@@ -474,19 +450,29 @@ if __name__ == '__main__':
         dem_dict = {}
         for m in range(im_env.num_stages):
             for x in range(im_env.num_agents_per_stage):
-                sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%4] = 1
-                dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%4] = 1
+                if m == 0: # retailer
+                    sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
+                    sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
+                    dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
+                    dem_dict[f"stage_{m}_agent_{x}"][0] = 1
+                elif m == im_env.num_stages - 1: # manufacturer
+                    sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
+                    sup_dict[f"stage_{m}_agent_{x}"][0] = 1
+                    dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
+                    dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
+                else:
+                    sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
+                    sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
+                    dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
+                    dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
         print("sup_dict", sup_dict)
 
         next_state_dict, rewards, terminations, truncations, infos = im_env.step(
-            action_dict={f"stage_{m}_agent_{x}": 4 for m in range(im_env.num_stages) for x in range(im_env.num_agents_per_stage)}, 
+            order_dict={f"stage_{m}_agent_{x}": np.array([4 for _ in range(num_agents_per_stage)]) for m in range(im_env.num_stages) for x in range(im_env.num_agents_per_stage)}, 
             sup_dict=sup_dict,
             dem_dict=dem_dict
         )
         
-
         print('-' * 80)
         print(f"period = {t}")
         print(f"next_state_dict = {next_state_dict}")

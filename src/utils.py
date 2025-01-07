@@ -120,14 +120,14 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
                     'order_cost': [state_dict[f'stage_{stage}_agent_{agent}'][2]],
                     'backlog_cost': [state_dict[f'stage_{stage}_agent_{agent}'][3]],
                     'holding_cost': [state_dict[f'stage_{stage}_agent_{agent}'][4]],
-                    # 'lead_time': [state_dict[f'stage_{stage}_agent_{agent}'][5]],
+                    'lead_time': [state_dict[f'stage_{stage}_agent_{agent}'][5]],
                     'inventory': [state_dict[f'stage_{stage}_agent_{agent}'][6]],
                     'backlog': [state_dict[f'stage_{stage}_agent_{agent}'][7]],
                     'upstream_backlog': [state_dict[f'stage_{stage}_agent_{agent}'][8]],
-                    "suppliers": [state_dict[f'stage_{stage}_agent_{agent}'][9:9+num_agents_per_stage]],
-                    "customers": [state_dict[f'stage_{stage}_agent_{agent}'][9+num_agents_per_stage:9+2*num_agents_per_stage]],
-                    'recent_sales': [state_dict[f'stage_{stage}_agent_{agent}'][(-2 * lt_max):(-lt_max)].tolist()],
-                    'deliveries': [state_dict[f'stage_{stage}_agent_{agent}'][-lt_max:].tolist()],
+                    "suppliers": [state_dict[f'stage_{stage}_agent_{agent}'][9]],
+                    "customers": [state_dict[f'stage_{stage}_agent_{agent}'][10]],
+                    'recent_sales': [state_dict[f'stage_{stage}_agent_{agent}'][11]],
+                    'deliveries': [state_dict[f'stage_{stage}_agent_{agent}'][12]],
                     'profits': [rewards.get(f'stage_{stage}_agent_{agent}', None)]
                     })], ignore_index=True)
             
@@ -237,9 +237,11 @@ def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage:
                 if m == 0: 
                     supply_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) 
                     supply_relations[m][x][x] = 1
-                    demand_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) # retailers have no downstream company
+                    demand_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) # assume that all retailers share the same downstream customer
+                    demand_relations[m][x][0] = 1
                 elif m == num_stages-1: 
-                    supply_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) # manufacturers have no upstream company
+                    supply_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int) # assume that all manufacturers share the same upstream supplier
+                    supply_relations[m][x][0] = 1
                     demand_relations[m][x] = np.zeros(num_agents_per_stage, dtype=int)
                     demand_relations[m][x][x] = 1
                 else:

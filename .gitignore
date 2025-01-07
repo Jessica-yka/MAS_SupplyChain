@@ -160,6 +160,7 @@ cython_debug/
 # Project
 results/
 runs/
+notebooks/draft.ipynb
 
 # api keys
 src/llm_config.py
