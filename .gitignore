@@ -160,3 +160,11 @@ cython_debug/
 # Project
 results/
 runs/
+
+# api keys
+src/llm_config.py
+
+.DS_Store
+
+# conda env
+uist2025/

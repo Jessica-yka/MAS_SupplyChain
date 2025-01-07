@@ -3,24 +3,40 @@ import pandas as pd
 import os
 import networkx as nx
 import matplotlib.pyplot as plt
+import re
 
 def save_array(data: np.ndarray, save_path: str):
     print("Saving data to: ", save_path)
     np.save(save_path, data)
 
-def convert_to_dict(input_string):
+def extract_pairs(input_string):
     # Remove unwanted characters and split the string
-    input_string = input_string.replace('(', '').replace(')', '')
-    pairs = input_string.split(', ')
+    """
+    Extracts pairs in the format ("agentX", N) or ("agentX": N) from a string.
     
-    result_dict = {}
+    Args:
+        input_string (str): The input string containing pairs.
     
-    for pair in pairs:
-        # Split each pair into key and value
-        key, value = pair.split(': ')
-        result_dict[key.strip().strip('\"')] = int(value.strip())
-        
-    return result_dict
+    Returns:
+        list: A list of tuples containing the extracted pairs.
+    """
+    # Regular expression to match pairs like ("agentX", N) or ("agentX": N)
+    pattern = r'\("([^"]+)"\s*[:,]\s*([0-9]+)\)'
+    
+    # Find all matches using the regex
+    matches = re.findall(pattern, input_string)
+    
+    # Convert matches to tuples with proper format
+    pairs = {agent: int(value) for agent, value in matches}
+    
+    return pairs
+
+def parse_stage_agent_id(stage_agent_id_name: str):
+    # Extract stage and agent from the string
+    id_name = stage_agent_id_name.replace("agent_", "").replace("stage_", "")
+    stage, agent = id_name.split("_")
+
+    return int(stage), int(agent)
 
 # Create a multipartite graph
 def draw_multipartite_graph(env, t: int, save_prefix: str):
@@ -104,7 +120,7 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
                     'order_cost': [state_dict[f'stage_{stage}_agent_{agent}'][2]],
                     'backlog_cost': [state_dict[f'stage_{stage}_agent_{agent}'][3]],
                     'holding_cost': [state_dict[f'stage_{stage}_agent_{agent}'][4]],
-                    'lead_time': [state_dict[f'stage_{stage}_agent_{agent}'][5]],
+                    # 'lead_time': [state_dict[f'stage_{stage}_agent_{agent}'][5]],
                     'inventory': [state_dict[f'stage_{stage}_agent_{agent}'][6]],
                     'backlog': [state_dict[f'stage_{stage}_agent_{agent}'][7]],
                     'upstream_backlog': [state_dict[f'stage_{stage}_agent_{agent}'][8]],
@@ -126,16 +142,17 @@ def random_relations(n_cand: int, n_relation: int):
 
     return np.random.choice(a=np.arange(n_cand), p=n_relation, replace=False)
 
-def generate_lead_time(dist: str, num_data: int, num_agents_per_stage: int, lb=2, ub=8, config_name: str="test"):
+def generate_lead_time(dist: str, num_stages: int, num_agents_per_stage: int, lb=2, ub=8, config_name: str="test"):
     # To generate lead time for each agent
     if dist == 'uniform':
-        data = np.random.uniform(low=lb, high=ub, size=(num_data, num_agents_per_stage))
+        data = np.random.uniform(low=lb, high=ub, size=(num_stages, num_agents_per_stage, num_agents_per_stage))
     elif dist == "constant":
         mean = (lb + ub)//2
-        data = [mean for _ in range(num_data)]
+        data = [mean for _ in range(num_stages * num_agents_per_stage * num_agents_per_stage)]
+        data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage)
     else:
         raise AssertionError("Lead time function is not implemented.")
-    save_array(data, f"../results/{config_name}/lead_time.npy")
+    save_array(data, f"results/{config_name}/lead_time.npy")
     return data
 
 def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, config_name: str="test"):
@@ -148,7 +165,7 @@ def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, con
     else:
         raise AssertionError("Prod capacity function is not implemented.")
     
-    save_array(data, f"../results/{config_name}/prod_capacity.npy")
+    save_array(data, f"results/{config_name}/prod_capacity.npy")
     return data
 
 
@@ -162,7 +179,7 @@ def generate_profit_rate(dist: str, num_data: int, lb=0, ub=1, config_name: str=
     else:
         raise AssertionError("Profit rate function is not implemented.")
     
-    save_array(data, f"../results/{config_name}/profit_rate.npy")
+    save_array(data, f"results/{config_name}/profit_rate.npy")
     return data
 
 def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20, config_name: str="test"):
@@ -175,7 +192,7 @@ def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20, config_name: str=
     else:
         raise AssertionError("Prod cost function is not implemented.")
     
-    save_array(data, f"../results/{config_name}/prod_cost.npy")
+    save_array(data, f"results/{config_name}/prod_cost.npy")
     return data
 
 def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, config_name: str="test"):
@@ -191,18 +208,20 @@ def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, c
     all_total_costs = []
 
     manu_prices = all_prod_costs[:num_agents_per_stage] * all_profit_rate[:num_agents_per_stage]
-    all_sale_prices += manu_prices # add prices of manufacturers to the price list
-    all_total_costs += all_prod_costs[:num_agents_per_stage] # add cost of manufacturers to the cost list
+
+    all_sale_prices += manu_prices.tolist() # add prices of manufacturers to the price list
+    all_total_costs += all_prod_costs[:num_agents_per_stage].tolist() # add cost of manufacturers to the cost list
     for i in range(1, num_stages):
         order_costs = all_sale_prices[-num_agents_per_stage:]
         prod_costs = all_prod_costs[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
         profit_rate = all_profit_rate[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
         downstream_prices = (order_costs + prod_costs) * profit_rate
 
-        all_sale_prices += downstream_prices
-    
-    save_array(all_sale_prices, f"../results/{config_name}/sale_prices.npy")
-    save_array(all_total_costs, f"../results/{config_name}/total_costs.npy")
+        all_sale_prices += downstream_prices.tolist()
+        all_total_costs += (order_costs + prod_costs).tolist()
+
+    save_array(all_sale_prices, f"results/{config_name}/sale_prices.npy")
+    save_array(all_total_costs, f"results/{config_name}/total_costs.npy")
     return all_total_costs, all_sale_prices
 
 
@@ -230,6 +249,7 @@ def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage:
                     demand_relations[m][x][x] = 1
     else:
         raise AssertionError("Relation function is not implemented.")
+    return supply_relations, demand_relations
     
 
 def generate_holding_costs(dist: str, num_data: int, lb: int=1, ub: int=5, config_name: str="test"):
@@ -242,7 +262,7 @@ def generate_holding_costs(dist: str, num_data: int, lb: int=1, ub: int=5, confi
     else:
         raise AssertionError("holding function is not implemented.")
 
-    save_array(data, f"../results/{config_name}/holding_costs.npy")
+    save_array(data, f"results/{config_name}/holding_costs.npy")
     return data
 
 
@@ -256,7 +276,7 @@ def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5, confi
     else:
         raise AssertionError("backlog function is not implemented.")
     
-    save_array(data, f"../results/{config_name}/backlog_costs.npy")
+    save_array(data, f"results/{config_name}/backlog_costs.npy")
     return data
     
 
@@ -270,10 +290,23 @@ def generate_init_inventories(dist: str, num_data: int, lb: int=10, ub: int=18, 
     else:
         raise AssertionError("init inventories is not implemented")
     
-    save_array(data, f"../results/{config_name}/init_inventories.npy")
+    save_array(data, f"results/{config_name}/init_inventories.npy")
     return data
 
+
+def generate_profit_rates(dist: str, num_data: int, lb=0, ub=1, config_name: str="test"):
+    # To generate profit rate for agents to decide price based on cost
+    if dist == "uniform":
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist == 'constant':
+        mean = (lb + ub)//2
+        data = [mean for _ in range(num_data)]
+    else:
+        raise AssertionError("Profit rate function is not implemented.")
     
+    save_array(data, f"results/{config_name}/profit_rate.npy")
+    return data
+
 
 class Demand_fn:
 
@@ -289,10 +322,12 @@ class Demand_fn:
 
     def uniform_demand(self):
         return np.random.randint(low=self.lb, high=self.ub)
-    
-    def forward(self, t):
+        
+    def __call__(self, t):
         self.period = t
-        if self.dist == 'constant':
+        if self.dist == 'constant_demand':
             return self.constant_demand()
-        elif self.dist == "uniform":
+        elif self.dist == "uniform_demand":
             return self.uniform_demand()
+        else:
+            raise AssertionError("Demand function is not implemented.")

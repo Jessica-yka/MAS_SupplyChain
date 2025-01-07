@@ -7,40 +7,47 @@ from typing import List
 from tqdm.notebook import tqdm
 from autogen import ConversableAgent
 from llm_config import llm_config_list
-from utils import convert_to_dict
+from utils import extract_pairs
 
 
 
 def get_state_description(state):
     suppliers = " ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
     non_suppliers = " ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
+    lead_times = " ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
+    arriving_delieveries = []
+    for i, _ in enumerate(state['suppliers']):
+        if state['suppliers'][i] == 1:
+            print('state deliveries', state['deliveries'])
+            arriving_delieveries.append(f"from agent{i}: {state['deliveries'][i][-state['lead_times'][i]:]}")
+    arriving_delieveries = " ".join(arriving_delieveries)
     return (
-        f" - Lead Time: {state['lead_time']} round(s)\n"
+        f" - Lead Time: {lead_times} round(s)\n"
         f" - Inventory Level: {state['inventory']} unit(s)\n"
         f" - Current Backlog (you owing to the downstream): {state['backlog']} unit(s)\n"
         f" - Upstream Backlog (your upstream owing to you): {state['upstream_backlog']} unit(s)\n"
         f" - Previous Sales (in the recent round(s), from old to new): {state['sales']}\n"
-        f" - Arriving Deliveries (in this and the next round(s), from near to far): {state['deliveries'][-state['lead_time']:]}\n"
+        f" - Arriving Deliveries (in this and the next round(s), from near to far): {arriving_delieveries}\n"
         f" - Your upstream suppliers are: {suppliers}\n" 
         f" - Other upstream suppliers are: {non_suppliers}\n"
     )
 
 
-def get_demand_description(env_config_name):
-    if env_config_name == "constant_demand":
+def get_demand_description(demand_fn: str) -> str:
+    if demand_fn == "constant_demand":
         return "The expected demand at the retailer (stage 1) is a constant 4 units for all 12 rounds."
-    elif env_config_name == "variable_demand":
+    elif demand_fn == "uniform_demand":
         return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for all 12 rounds."
-    elif env_config_name == "larger_demand":
+    elif demand_fn == "larger_demand":
         return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 8} for all 12 rounds."
-    elif env_config_name == "seasonal_demand":
+    elif demand_fn == "seasonal_demand":
         return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for the first 4 rounds, " \
             "and a discrete uniform distribution U{5, 8} for the last 8 rounds."
-    elif env_config_name == "normal_demand":
+    elif demand_fn == "normal_demand":
         return "The expected demand at the retailer (stage 1) is a normal distribution N(4, 2^2), " \
             "truncated at 0, for all 12 rounds."
     else:
-        raise KeyError(f"Error: {env_config_name} not implemented.")
+        raise KeyError(f"Error: {demand_fn} not implemented.")
 
 
 def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config) -> List[ConversableAgent]:
@@ -62,9 +69,9 @@ def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config)
     return agents
 
 
-def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
+def run_simulation(im_env, user_proxy, stage_agents):
    
-    demand_description = get_demand_description(env_config_name) 
+    demand_description = get_demand_description(im_env.demand_dist) 
     all_state_dicts = {}
     all_action_order_dicts = {}
     all_action_sup_dicts = {}
@@ -86,7 +93,7 @@ def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
         for stage in range(num_stages):
             for agent in range(num_agents_per_stage):
                 stage_state = state_dict[f'stage_{stage}_agent_{agent}']
-                
+
                 if stage != 0:
                     downstream_order = f"Your downstream order from the stage {stage} for this round is {action_order_dict[f'stage_{stage - 1}_agent_{agent}']}. "
                 else:
@@ -128,8 +135,6 @@ def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
                 api_cost += chat_result.cost['usage_including_cached_inference']['total_cost']
                 # print(chat_summary)
                 match = re.findall(r'\[(.*?)\]', chat_summary)
-                # print(match)
-
                 
                 sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
                 remove_sup = match[0]                
@@ -148,17 +153,17 @@ def run_simulation(env_config_name, im_env, user_proxy, stage_agents):
                 #     stage_action = int(match.group(1))
                 # else:
                 #     stage_action = 0
-                stage_order_action = np.zeros(num_agents_per_stage, type=int)
-                if not match[2]:
-                    supplier_order_dict = convert_to_dict(match[2])
+                stage_order_action = np.zeros(num_agents_per_stage, dtype=int)
+                if match[2]:
+                    supplier_order_dict = extract_pairs(match[2])
                     for i in range(num_agents_per_stage):
-                        stage_order_action[i] = supplier_order_dict[f"agent{i}"]
+                        stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0)
                 action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
 
                 print("action sup action", sup_action)
                 print("action order action", stage_order_action)
-            
-            
+
+
         next_states, rewards, terminations, truncations, infos = im_env.step(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict)
         next_state_dict = im_env.parse_state(next_states)
         all_state_dicts[period + 1] = next_state_dict
