@@ -205,24 +205,24 @@ def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, c
     all_prod_costs = generate_prod_cost(dist=dist, num_data=num_total_agents)
 
     all_sale_prices = []
-    all_total_costs = []
+    all_order_costs = []
 
     manu_prices = all_prod_costs[:num_agents_per_stage] * all_profit_rate[:num_agents_per_stage]
 
     all_sale_prices += manu_prices.tolist() # add prices of manufacturers to the price list
-    all_total_costs += all_prod_costs[:num_agents_per_stage].tolist() # add cost of manufacturers to the cost list
+    all_order_costs += [0 for _ in range(num_agents_per_stage)] # add cost of manufacturers to the cost list
     for i in range(1, num_stages):
         order_costs = all_sale_prices[-num_agents_per_stage:]
         prod_costs = all_prod_costs[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
         profit_rate = all_profit_rate[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
-        downstream_prices = (order_costs + prod_costs) * profit_rate
+        sale_prices = (order_costs + prod_costs) * profit_rate
 
-        all_sale_prices += downstream_prices.tolist()
-        all_total_costs += (order_costs + prod_costs).tolist()
+        all_sale_prices += sale_prices.tolist()
+        all_order_costs += order_costs
 
     save_array(all_sale_prices, f"results/{config_name}/sale_prices.npy")
-    save_array(all_total_costs, f"results/{config_name}/total_costs.npy")
-    return all_total_costs, all_sale_prices
+    save_array(all_order_costs, f"results/{config_name}/total_costs.npy")
+    return all_order_costs, all_sale_prices
 
 
 def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage: int):

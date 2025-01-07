@@ -120,7 +120,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.period = 0
         self.inventories = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.orders = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
-        self.arriving_orders = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
+        self.arriving_orders = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.sales = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.backlogs = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.demands = np.zeros(self.num_periods + 1, dtype=int)
@@ -302,22 +302,21 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         # Compute the fulfilled orders
         # R_{m,t} = min(B_{m+1,t-1} + O_{m,t}, I_{m+1,t-1} + R_{m+1,t-L_{m+1}}, c_{m+1}), m = 0, ..., M - 2
-        cum_orders = np.sum(self.orders, axis=1)
-        print("cum orders\n", cum_orders)
-        print("orders\n", self.orders[:-1, :, :, t])
-        print("backlogs\n", self.backlogs[1:, :, t - 1])
-        print("current inventories\n", current_inventories[1:])
-        self.arriving_orders[:-1, :, t] = np.minimum(
-            np.minimum(self.backlogs[1:, :, t - 1] + cum_orders[:-1, :, t], current_inventories[1:]),
+        cum_req_orders = np.sum(self.orders[:, :, :, t], axis=1)
+        fulfilled_orders = np.zeros(shape=(self.num_stages, self.num_agents_per_stage), dtype=int)
+        fulfilled_orders[:-1] = np.minimum(
+            np.minimum(self.backlogs[1:, :, t - 1] + cum_req_orders[:-1], current_inventories[1:]),
             self.prod_capacities[1:])
         # R_{M-1,t} = O_{M-1,t}
-        self.arriving_orders[M - 1, :, t] = cum_orders[M - 1, :, t] # the manufacturers at the top of supply chain
-        print("arriving orders\n", self.arriving_orders[:, :, t])
-        exit()
+        fulfilled_orders[M - 1] = cum_req_orders[M - 1] # the manufacturers at the top of supply chain
+        fulfilled_rates = fulfilled_orders / cum_req_orders
+        fulfilled_rates = np.repeat(fulfilled_rates[:, np.newaxis, :], self.num_agents_per_stage, axis=1)
+        self.arriving_orders[:, :, :, t] = self.orders[:, :, :, t] * fulfilled_rates
+        
         # Compute the sales
         cum_arriving_orders = np.sum(self.arriving_orders, axis=2)
         # S_{m,t} = R_{m-1,t}, m = 1, ..., M - 1
-        self.sales[1:, :, t] =cum_arriving_orders[:-1, :, t]
+        self.sales[1:, :, t] = cum_arriving_orders[:-1, :, t]
         # S_{0,t} = min(B_{0,t-1} + D_{t}, I_{0,t-1} + R_{0,t-L_m}, c_0)
 
         self.sales[0, :, t] = np.minimum(
@@ -326,7 +325,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         
         # Compute the backlogs
         # B_{m,t} = B_{m,t-1} + O_{m-1,t} - S_{m,t}, m = 1, ..., M - 1
-        self.backlogs[1:, :, t] = self.backlogs[1:, :, t - 1] + cum_orders[:-1, :, t] - self.sales[1:, :, t]
+        self.backlogs[1:, :, t] = self.backlogs[1:, :, t - 1] + cum_req_orders[:-1] - self.sales[1:, :, t]
         # B_{0,t} = B_{0,t-1} + D_{t} - S_{0,t}
         self.backlogs[0, :, t] = self.backlogs[0, :, t - 1] + self.demands[t] - self.sales[0, :, t]
 
@@ -336,10 +335,10 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         # Compute the profits
         # P_{m,t} = p_m S_{m,t} - r_m R_{m,t} - k_m B_{m,t} - h_m I_{m,t}
-        print("order costs", self.order_costs)
-        print("arriving orders", self.arriving_orders[:, :, :, t])
-        exit()
-        self.profits[:, :, t] = self.sale_prices * self.sales[:, :, t] - self.order_costs * self.arriving_orders[:, :, :, t] \
+        order_costs = np.repeat(self.order_costs[:, np.newaxis, :], self.num_agents_per_stage, axis=1)
+        order_costs = order_costs * self.arriving_orders[:, :, :, t]
+        order_costs = np.sum(order_costs, axis=2)
+        self.profits[:, :, t] = self.sale_prices * self.sales[:, :, t] - order_costs \
                              - self.backlog_costs * self.backlogs[:, :, t] - self.holding_costs * self.inventories[:, :, t] \
         
 
@@ -429,7 +428,8 @@ def env_creator(env_config):
 
 if __name__ == '__main__':
 
-    ec = get_env_configs(env_configs['basic'])
+    config_name = 'basic'
+    ec = get_env_configs(env_configs[config_name])
     im_env = env_creator(env_config=ec)
     im_env.reset()
     print(f"stage_names = {im_env.stage_names}")
@@ -441,7 +441,7 @@ if __name__ == '__main__':
     print(f"action_order_sample = {im_env.action_order_space.sample()}")
     print(f"action_supply_space = {im_env.action_supply_space}")
     print(f"action_demand_space = {im_env.action_demand_space}")
-    visualize_state(env=im_env, rewards={}, t=-1, save_prefix="test")
+    visualize_state(env=im_env, rewards={}, t=-1, save_prefix=config_name)
     num_agents_per_stage = im_env.num_agents_per_stage
 
     for t in range(im_env.num_periods):
