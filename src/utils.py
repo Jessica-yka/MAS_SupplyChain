@@ -57,7 +57,6 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
             stage_agents.append(f"s{m}a{x}")
         M.add_nodes_from(stage_agents, layer=num_stages-m)  # Add set A nodes
 
-
     # Add edges between the sets
     edges = []
     for m in range(num_stages-1):
@@ -67,7 +66,6 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
                     src = f"s{m+1}a{i}"
                     tgt = f"s{m}a{x}"
                     edges.append((src, tgt))
-
     M.add_edges_from(edges)
 
     # Define positions for the multipartite layout
@@ -86,6 +84,7 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
 
 def visualize_state(env, rewards: dict, t: int, save_prefix: str):
     
+    os.makedirs(f"results/{save_prefix}", exist_ok=True)
     state_dict = env.state_dict
     num_stages = env.num_stages
     num_agents_per_stage = env.num_agents_per_stage
@@ -152,7 +151,7 @@ def generate_lead_time(dist: str, num_stages: int, num_agents_per_stage: int, lb
         data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage)
     else:
         raise AssertionError("Lead time function is not implemented.")
-    save_array(data, f"results/{config_name}/lead_time.npy")
+    save_array(data, f"env/{config_name}/lead_time.npy")
     return data
 
 def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, config_name: str="test"):
@@ -165,7 +164,7 @@ def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, con
     else:
         raise AssertionError("Prod capacity function is not implemented.")
     
-    save_array(data, f"results/{config_name}/prod_capacity.npy")
+    save_array(data, f"env/{config_name}/prod_capacity.npy")
     return data
 
 
@@ -179,7 +178,7 @@ def generate_profit_rate(dist: str, num_data: int, lb=0, ub=1, config_name: str=
     else:
         raise AssertionError("Profit rate function is not implemented.")
     
-    save_array(data, f"results/{config_name}/profit_rate.npy")
+    save_array(data, f"env/{config_name}/profit_rate.npy")
     return data
 
 def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20, config_name: str="test"):
@@ -192,7 +191,7 @@ def generate_prod_cost(dist: str, num_data: int, lb=10, ub=20, config_name: str=
     else:
         raise AssertionError("Prod cost function is not implemented.")
     
-    save_array(data, f"results/{config_name}/prod_cost.npy")
+    save_array(data, f"env/{config_name}/prod_cost.npy")
     return data
 
 def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, config_name: str="test"):
@@ -201,8 +200,8 @@ def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, c
     # cost = order cost + production cost
     num_total_agents = num_stages * num_agents_per_stage
 
-    all_profit_rate = generate_profit_rate(dist=dist, num_data=num_total_agents)
-    all_prod_costs = generate_prod_cost(dist=dist, num_data=num_total_agents)
+    all_profit_rate = generate_profit_rate(dist=dist, num_data=num_total_agents, config_name=config_name)
+    all_prod_costs = generate_prod_cost(dist=dist, num_data=num_total_agents, config_name=config_name)
 
     all_sale_prices = []
     all_order_costs = []
@@ -212,16 +211,16 @@ def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, c
     all_sale_prices += manu_prices.tolist() # add prices of manufacturers to the price list
     all_order_costs += [0 for _ in range(num_agents_per_stage)] # add cost of manufacturers to the cost list
     for i in range(1, num_stages):
-        order_costs = all_sale_prices[-num_agents_per_stage:]
+        order_costs = all_sale_prices[:num_agents_per_stage]
         prod_costs = all_prod_costs[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
         profit_rate = all_profit_rate[i*num_agents_per_stage:(i+1)*num_agents_per_stage]
         sale_prices = (order_costs + prod_costs) * profit_rate
 
-        all_sale_prices += sale_prices.tolist()
-        all_order_costs += order_costs
+        all_sale_prices = sale_prices.tolist() + all_sale_prices
+        all_order_costs = order_costs + all_order_costs
 
-    save_array(all_sale_prices, f"results/{config_name}/sale_prices.npy")
-    save_array(all_order_costs, f"results/{config_name}/total_costs.npy")
+    save_array(all_sale_prices, f"env/{config_name}/sale_prices.npy")
+    save_array(all_order_costs, f"env/{config_name}/total_costs.npy")
     return all_order_costs, all_sale_prices
 
 
@@ -264,7 +263,7 @@ def generate_holding_costs(dist: str, num_data: int, lb: int=1, ub: int=5, confi
     else:
         raise AssertionError("holding function is not implemented.")
 
-    save_array(data, f"results/{config_name}/holding_costs.npy")
+    save_array(data, f"env/{config_name}/holding_costs.npy")
     return data
 
 
@@ -278,7 +277,7 @@ def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5, confi
     else:
         raise AssertionError("backlog function is not implemented.")
     
-    save_array(data, f"results/{config_name}/backlog_costs.npy")
+    save_array(data, f"env/{config_name}/backlog_costs.npy")
     return data
     
 
@@ -292,7 +291,7 @@ def generate_init_inventories(dist: str, num_data: int, lb: int=10, ub: int=18, 
     else:
         raise AssertionError("init inventories is not implemented")
     
-    save_array(data, f"results/{config_name}/init_inventories.npy")
+    save_array(data, f"env/{config_name}/init_inventories.npy")
     return data
 
 
@@ -306,7 +305,7 @@ def generate_profit_rates(dist: str, num_data: int, lb=0, ub=1, config_name: str
     else:
         raise AssertionError("Profit rate function is not implemented.")
     
-    save_array(data, f"results/{config_name}/profit_rate.npy")
+    save_array(data, f"env/{config_name}/profit_rate.npy")
     return data
 
 

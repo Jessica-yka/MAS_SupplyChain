@@ -16,8 +16,8 @@ env_configs = {
     "basic": {
         "config_name": "basic",
         "sup_dem_relation_type": "single", # single/multiple
-        "num_agents_per_stage": 3, # >= 2
-        "num_periods": 1, 
+        "num_agents_per_stage": 2, # >= 2
+        "num_periods": 6, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": "uniform", # constant/uniform/etc
@@ -33,7 +33,7 @@ env_configs = {
 
 def get_env_configs(env_configs: dict):
     # create the dir to store the results
-    os.makedirs(f"results/{env_configs['config_name']}", exist_ok=True)
+    os.makedirs(f"env/{env_configs['config_name']}", exist_ok=True)
 
     num_stages = env_configs["num_stages"]
     num_agents_per_stage = env_configs["num_agents_per_stage"]
@@ -42,7 +42,7 @@ def get_env_configs(env_configs: dict):
     
     supply_relations, demand_relations = \
         generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage)
-    sale_prices, order_costs = \
+    order_costs, sale_prices = \
         generate_cost_price(dist=env_configs["price_cost_dist"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=env_configs["config_name"])
     holding_costs = \
         generate_holding_costs(dist=env_configs["holding_costs_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
@@ -54,8 +54,8 @@ def get_env_configs(env_configs: dict):
         generate_prod_capacity(dist=env_configs['prod_capacity_dist'], num_data=num_total_agents, config_name=env_configs["config_name"])
     init_inventories = \
         generate_init_inventories(dist=env_configs["init_inventory_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
-    profit_rates = \
-        generate_profit_rates(dist=env_configs["profit_rate_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
+    # profit_rates = \
+    #     generate_profit_rates(dist=env_configs["profit_rate_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     demand_fn = Demand_fn(dist=env_configs["demand_fn"])
     stage_names = env_configs["stage_names"]
 
@@ -73,7 +73,6 @@ def get_env_configs(env_configs: dict):
         'order_costs': order_costs,
         'backlog_costs': backlog_costs,
         'holding_costs': holding_costs,
-        "profit_rates": profit_rates,
         'supply_relations': supply_relations,
         "demand_relations": demand_relations,
         'stage_names': stage_names,

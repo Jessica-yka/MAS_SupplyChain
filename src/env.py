@@ -46,7 +46,7 @@ class InventoryManagementEnv(MultiAgentEnv):
 
     def __init__(
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
-        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list, profit_rates: list, 
+        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list,
         supply_relations: dict, demand_relations: dict, stage_names: list, init_seed: int = 0):
         """
         Initialize the inventory management environment
@@ -88,8 +88,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         assert len(holding_costs) == num_stages * num_agents_per_stage, \
             "The number of unit inventory holding costs should be the total number of agents in the environment."
         assert np.min(holding_costs) >= 0, "The unit inventory holding costs should be non-negative."
-        assert len(profit_rates) == num_stages * num_agents_per_stage, \
-            "The number of profit rates should be the total number of agents in the environment."
         assert len(supply_relations) == num_stages and len(supply_relations[0]) == num_agents_per_stage, \
             "The number of supply relations should be the total number of agents in the environment"
         assert len(demand_relations) == num_stages and len(demand_relations[0]) == num_agents_per_stage, \
@@ -112,7 +110,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.order_costs = np.array(order_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.backlog_costs = np.array(backlog_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.holding_costs = np.array(holding_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
-        self.profit_rates = np.array(profit_rates, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.supply_relations = supply_relations
         self.demand_relations = demand_relations
 
@@ -229,9 +226,9 @@ class InventoryManagementEnv(MultiAgentEnv):
         lt_max = self.max_lead_time
         states["recent_sales"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, lt_max), dtype=int)
         if t >= lt_max:
-            states["recent_sales"][:, :, (-2 * lt_max):-lt_max] = self.sales[:, :, (t - lt_max + 1):(t + 1)]
+            states["recent_sales"] = self.sales[:, :, (t - lt_max + 1):(t + 1)]
         elif t > 0:
-            states["recent_sales"][:, :, (-lt_max - t):-lt_max] = self.sales[:, :, 1:(t + 1)]
+            states["recent_sales"][:, :, -t:] = self.sales[:, :, 1:(t + 1)]
 
         states["arriving_deliveries"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, lt_max), dtype=int)
         for m in range(self.num_stages):
@@ -240,9 +237,9 @@ class InventoryManagementEnv(MultiAgentEnv):
                     if self.supply_relations[m][x][j] == 1:
                         lt = self.lead_times[m][x][j]
                         if t >= lt:
-                            states["arriving_deliveries"][m, x, j, (-2 * lt_max):-lt_max] = self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
+                            states["arriving_deliveries"][m, x, j, -lt:] = self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
                         elif t > 0:
-                            states["arriving_deliveries"][m, x, j, (-lt_max - t):-lt_max] = self.arriving_orders[m, x, j, 1:(t + 1)]
+                            states["arriving_deliveries"][m, x, j, -t:] = self.arriving_orders[m, x, j, 1:(t + 1)]
 
         # self.state_dict = {f"stage_{m}_agent_{x}": states[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         self.state_dict = {}
@@ -289,7 +286,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         
         self.demands[t] = int(self.demand_fn(t))
-
         # Add the delivered orders
         # I_{m,t} <- I_{m,t-1} + R_{m,t-L_m} (after delivery)
         for m in range(self.num_stages):
@@ -298,7 +294,7 @@ class InventoryManagementEnv(MultiAgentEnv):
                     if self.supply_relations[m][i][j] == 1:
                         lt = self.lead_times[m][i][j]
                         if t >= lt:
-                            current_inventories[m][i][j] += self.arriving_orders[m, i, j, t - lt] # the order placed before the lead time
+                            current_inventories[m][i] += self.arriving_orders[m, i, j, t - lt] # the order placed before the lead time
 
         # Compute the fulfilled orders
         # R_{m,t} = min(B_{m+1,t-1} + O_{m,t}, I_{m+1,t-1} + R_{m+1,t-L_{m+1}}, c_{m+1}), m = 0, ..., M - 2
@@ -419,7 +415,6 @@ def env_creator(env_config):
         order_costs=env_config['order_costs'],
         backlog_costs=env_config['backlog_costs'],
         holding_costs=env_config['holding_costs'],
-        profit_rates=env_config['profit_rates'],
         supply_relations=env_config['supply_relations'],
         demand_relations=env_config['demand_relations'], 
         stage_names=env_config['stage_names'],
@@ -465,7 +460,6 @@ if __name__ == '__main__':
                     sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
                     dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
                     dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
-        print("sup_dict", sup_dict)
 
         next_state_dict, rewards, terminations, truncations, infos = im_env.step(
             order_dict={f"stage_{m}_agent_{x}": np.array([4 for _ in range(num_agents_per_stage)]) for m in range(im_env.num_stages) for x in range(im_env.num_agents_per_stage)}, 
@@ -481,5 +475,5 @@ if __name__ == '__main__':
         print(f"terminations = {terminations}")
         print(f"truncations = {truncations}")
         print(f"infos = {infos}")
-        visualize_state(env=im_env, rewards=rewards, t=t, save_prefix='test')
+        visualize_state(env=im_env, rewards=rewards, t=t, save_prefix=config_name)
 
