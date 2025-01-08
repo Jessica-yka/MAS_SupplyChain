@@ -13,7 +13,7 @@ from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from config import env_configs, get_env_configs
 from utils import visualize_state, parse_stage_agent_id, clear_dir
-from utils import generate_sup_dem_relations
+from data_simulation import generate_sup_dem_relations
 import os
 
 np.random.seed(0)
@@ -425,7 +425,7 @@ def env_creator(env_config):
 
 if __name__ == '__main__':
 
-    config_name = 'test'
+    config_name = 'basic'
     # create the dir to store the results
     os.makedirs(f"results/{config_name}", exist_ok=True)
     clear_dir(f"results/{config_name}")

@@ -2,14 +2,12 @@
 Environment Configurations
 """
 import numpy as np
-from utils import random_relations
-from utils import generate_lead_time, generate_prod_capacity
-from utils import generate_cost_price, generate_sup_dem_relations
-from utils import generate_holding_costs, generate_backlog_costs, generate_init_inventories
-from utils import generate_profit_rates
-from utils import Demand_fn
-from utils import clear_dir
+from data_simulation import generate_lead_time, generate_prod_capacity
+from data_simulation import generate_cost_price, generate_sup_dem_relations
+from data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
+from data_simulation import Demand_fn
 import os
+from utils import save_dict_to_json
 
 np.random.seed(0)
 
@@ -37,8 +35,8 @@ env_configs = {
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 1,
         "num_init_customers": 1,
-        "num_agents_per_stage": 2, # >= 2
-        "num_periods": 8, 
+        "num_agents_per_stage": 6, # >= 2
+        "num_periods": 15, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": "uniform", # constant/uniform/etc
@@ -54,7 +52,7 @@ env_configs = {
 
 def get_env_configs(env_configs: dict):
     
-    
+    save_dict_to_json(data=env_configs, save_path=env_configs['config_name'])
     num_stages = env_configs["num_stages"]
     num_agents_per_stage = env_configs["num_agents_per_stage"]
     num_periods = env_configs["num_periods"]

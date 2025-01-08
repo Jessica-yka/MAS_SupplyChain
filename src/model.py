@@ -8,46 +8,8 @@ from tqdm.notebook import tqdm
 from autogen import ConversableAgent
 from llm_config import llm_config_list
 from utils import extract_pairs
+from form_msg import generate_msg
 
-
-
-def get_state_description(state):
-    suppliers = " ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
-    non_suppliers = " ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
-    lead_times = " ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
-    arriving_delieveries = []
-    for i, _ in enumerate(state['suppliers']):
-        if state['suppliers'][i] == 1:
-            print('state deliveries', state['deliveries'])
-            arriving_delieveries.append(f"from agent{i}: {state['deliveries'][i][-state['lead_times'][i]:]}")
-    arriving_delieveries = " ".join(arriving_delieveries)
-    return (
-        f" - Lead Time: {lead_times} round(s)\n"
-        f" - Inventory Level: {state['inventory']} unit(s)\n"
-        f" - Current Backlog (you owing to the downstream): {state['backlog']} unit(s)\n"
-        f" - Upstream Backlog (your upstream owing to you): {state['upstream_backlog']} unit(s)\n"
-        f" - Previous Sales (in the recent round(s), from old to new): {state['sales']}\n"
-        f" - Arriving Deliveries (in this and the next round(s), from near to far): {arriving_delieveries}\n"
-        f" - Your upstream suppliers are: {suppliers}\n" 
-        f" - Other upstream suppliers are: {non_suppliers}\n"
-    )
-
-
-def get_demand_description(demand_fn: str) -> str:
-    if demand_fn == "constant_demand":
-        return "The expected demand at the retailer (stage 1) is a constant 4 units for all 12 rounds."
-    elif demand_fn == "uniform_demand":
-        return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for all 12 rounds."
-    elif demand_fn == "larger_demand":
-        return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 8} for all 12 rounds."
-    elif demand_fn == "seasonal_demand":
-        return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for the first 4 rounds, " \
-            "and a discrete uniform distribution U{5, 8} for the last 8 rounds."
-    elif demand_fn == "normal_demand":
-        return "The expected demand at the retailer (stage 1) is a normal distribution N(4, 2^2), " \
-            "truncated at 0, for all 12 rounds."
-    else:
-        raise KeyError(f"Error: {demand_fn} not implemented.")
 
 
 def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config) -> List[ConversableAgent]:
@@ -71,7 +33,6 @@ def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config)
 
 def run_simulation(im_env, user_proxy, stage_agents):
    
-    demand_description = get_demand_description(im_env.demand_dist) 
     all_state_dicts = {}
     all_action_order_dicts = {}
     all_action_sup_dicts = {}
@@ -94,36 +55,8 @@ def run_simulation(im_env, user_proxy, stage_agents):
             for agent in range(num_agents_per_stage):
                 stage_state = state_dict[f'stage_{stage}_agent_{agent}']
 
-                if stage != 0:
-                    downstream_order = f"Your downstream order from the stage {stage} for this round is {action_order_dict[f'stage_{stage - 1}_agent_{agent}']}. "
-                else:
-                    downstream_order = ""
-
-                message = (
-                    f"Now this is the round {period + 1}, "
-                    f"and you are at the stage {stage + 1}: {im_env.stage_names[stage]} in the supply chain. "
-                    f"Given your current state:\n{get_state_description(stage_state)}\n\n"
-                    f"{demand_description} {downstream_order}"
-                    "There are three tasks for you to make decision\n"
-                    "Task1: Do you want to remove any upstream suppliers?\n\n"
-                    "Please state your reason in 1-2 sentences first "
-                    "and then provide your action as a list (e.g. [0, 1] for removing agent0 and agent1 as suppliers, [] for doing nothing)\n"
-                    "Task2: Do you want to add any upstream suppliers?\n\n"
-                    "Please state your reason in 1-2 sentences first "
-                    "and then provide your action as a list (e.g. [2, 3] for adding agent2 and agent3 as suppliers, [] for doing nothing)\n"
-                    "Task3: What is the order quantity you would like to place with each supplier for this round?\n\n"
-                    "Golden rule of this game: Open orders should always equal to \"expected downstream orders + backlog\". "
-                    "If open orders are larger than this, the inventory will rise (once the open orders arrive). "
-                    "If open orders are smaller than this, the backlog will not go down and it may even rise. "
-                    "Please consider the lead time and place your order in advance. "
-                    "Remember that your upstream has its own lead time, so do not wait until your inventory runs out. "
-                    "Also, avoid ordering too many units at once. "
-                    "Try to spread your orders over multiple rounds to prevent the bullwhip effect. "
-                    "Anticipate future demand changes and adjust your orders accordingly to maintain a stable inventory level.\n\n"
-                    "Please state your reason in 1-2 sentences first "
-                    "and then provide your order as supplier-order pair in a list (e.g. [(\"agent0\": 4), (\"agent1\": 2)])."
-                )
-
+                message = generate_msg(stage=stage, agent=agent, stage_state=stage_state, im_env=im_env, \
+                                       action_order_dict=action_order_dict, period=period)
                 chat_result = user_proxy.initiate_chat(
                     stage_agents[stage*num_agents_per_stage+agent],
                     message={'content': ''.join(message)},
@@ -134,16 +67,19 @@ def run_simulation(im_env, user_proxy, stage_agents):
                 chat_summary = chat_result.summary
                 api_cost += chat_result.cost['usage_including_cached_inference']['total_cost']
                 # print(chat_summary)
-                match = re.findall(r'\[(.*?)\]', chat_summary)
+                match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
+                print("match", match)
                 
                 sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
                 remove_sup = match[0]                
                 if remove_sup != "":
+                    remove_sup = remove_sup.replace("agent", "")
                     remove_sup = [int(ind) for ind in remove_sup.split(", ")]
                     for ind in remove_sup:
                         sup_action[ind] = 0
                 add_sup = match[1]
                 if add_sup != "":
+                    add_sup = add_sup.replace("agent", "")
                     add_sup = [int(ind) for ind in add_sup.split(", ")]
                     for ind in add_sup:
                         sup_action[ind] = 1

@@ -15,8 +15,9 @@ from env import env_creator
 from config import env_configs, get_env_configs
 from llm_config import llm_config_list
 from openai import AzureOpenAI
-from model import get_demand_description, get_state_description, create_agents
+from model import create_agents
 from model import run_simulation
+from utils import get_demand_description, get_state_description
 
 np.random.seed(42)
 
