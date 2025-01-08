@@ -157,20 +157,22 @@ def random_relations(n_cand: int, n_relation: int):
     return np.random.choice(a=n_cand, size=n_relation, replace=False)
 
 
-def get_state_description(state):
+def get_state_description(state, state_idx: int):
 
     suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
     non_suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
-    lead_times = "; ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
+    lead_times = " round(s); ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
     arriving_delieveries = []
-
     for i, _ in enumerate(state['suppliers']):
         if state['suppliers'][i] == 1:
             arriving_delieveries.append(f"from agent{i}: {state['deliveries'][i][-state['lead_times'][i]:]}")
+    order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
 
     arriving_delieveries = " ".join(arriving_delieveries)
+
     return (
         f" - Lead Time: {lead_times} round(s)\n"
+        f" - Order costs: {order_costs} unit(s)\n"
         f" - Inventory Level: {state['inventory']} unit(s)\n"
         f" - Current Backlog (you owing to the downstream): {state['backlog']} unit(s)\n"
         f" - Upstream Backlog (your upstream owing to you): {state['upstream_backlog']} unit(s)\n"

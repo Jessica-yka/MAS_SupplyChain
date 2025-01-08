@@ -368,7 +368,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         return {
             'prod_capacity': state[0],
             'sale_price': state[1],
-            'num_periods_cost': state[2],
+            'order_costs': state[2],
             'backlog_cost': state[3],
             'holding_cost': state[4],
             'lead_times': state[5],

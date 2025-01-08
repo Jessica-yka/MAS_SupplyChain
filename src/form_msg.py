@@ -12,7 +12,7 @@ task2_msg = (
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round?\n"
     "Please state your reason in 1-2 sentences first "
-    "and then provide your action as a list following this format (e.g. [(\"agent0\": 4), (\"agent1\": 2)]).\n"
+    "and then provide your action as a list following this format. E.g.,[(\"agent0\": 4), (\"agent1\": 2)].\n"
 )
 gold_rule_msg = (
     "Golden rule of this game: Open orders should always equal to \"expected downstream orders + backlog\". "

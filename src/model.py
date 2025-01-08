@@ -66,7 +66,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
                     clear_history=False,
                 )
                 chat_summary = chat_result.summary
-                total_chat_summary += (state_info + chat_summary)
+                total_chat_summary += (state_info + chat_summary + '\n\n\n\n')
                 api_cost += chat_result.cost['usage_including_cached_inference']['total_cost']
                 # print(chat_summary)
                 match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
