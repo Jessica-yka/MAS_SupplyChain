@@ -18,7 +18,7 @@ from openai import AzureOpenAI
 from model import create_agents
 from model import run_simulation
 from utils import get_demand_description, get_state_description
-
+from utils import clear_dir
 np.random.seed(42)
 
 # %%
@@ -33,6 +33,12 @@ config_list = llm_config_list
 
 # %%
 env_config_name = "basic"
+# create the dir to store the results
+os.makedirs(f"results/{env_config_name}", exist_ok=True)
+clear_dir(f"results/{env_config_name}")
+# create the dir to store the env setup
+os.makedirs(f"env/{env_config_name}", exist_ok=True)
+clear_dir(f"env/{env_config_name}")
 env_config = get_env_configs(env_configs=env_configs[env_config_name])
 im_env = env_creator(env_config)
 
@@ -66,10 +72,9 @@ stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_p
 
 # %%
 rewards = []
-
 for _ in tqdm(range(1)):
     stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list':config_list})
-    reward = run_simulation(im_env, user_proxy, stage_agents)
+    reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name)
     rewards.append(reward)
     print(f"rewards = {rewards}")
 

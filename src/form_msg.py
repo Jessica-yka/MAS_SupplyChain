@@ -3,16 +3,16 @@ from utils import get_state_description, get_demand_description
 task1_msg = (
     "Task1: Do you want to remove any upstream suppliers?\n"
     "Please state your reason in 1-2 sentences first "
-    "and then provide your action as a list (e.g. [0, 1] for removing agent0 and agent1 as suppliers, [] for doing nothing)\n") 
+    "and then provide your action as a list following this format (e.g., [0, 1] for removing agent0 and agent1 as suppliers, [] for doing nothing)\n") 
 task2_msg = (
     "Task2: Do you want to add any upstream suppliers?\n"
     "Please state your reason in 1-2 sentences first "
-    "and then provide your action as a list (e.g. [2, 3] for adding agent2 and agent3 as suppliers, [] for doing nothing)\n"
+    "and then provide your action as a list following this format (e.g., [2, 3] for adding agent2 and agent3 as suppliers, [] for doing nothing)\n"
 )
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round?\n"
     "Please state your reason in 1-2 sentences first "
-    "and then provide your order as supplier-order pair in a list (e.g. [(\"agent0\": 4), (\"agent1\": 2)]).\n"
+    "and then provide your action as a list following this format (e.g. [(\"agent0\": 4), (\"agent1\": 2)]).\n"
 )
 gold_rule_msg = (
     "Golden rule of this game: Open orders should always equal to \"expected downstream orders + backlog\". "
@@ -38,6 +38,7 @@ def generate_msg(im_env, action_order_dict: dict, stage_state: dict, period: int
         f"and you are at the stage {stage + 1}: {im_env.stage_names[stage]} in the supply chain. "
         f"Given your current state:\n{get_state_description(stage_state)}\n\n"
     )
+    state_info = message
     if stage == 0:
         message += f"{demand_description}\n"
     else:
@@ -56,5 +57,5 @@ def generate_msg(im_env, action_order_dict: dict, stage_state: dict, period: int
 
     message += f"{gold_rule_msg}\n"
     
-    return message
+    return message, state_info
 

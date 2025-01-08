@@ -17,13 +17,15 @@ def generate_lead_time(dist: str, num_stages: int, num_agents_per_stage: int, lb
     save_array(data, f"env/{config_name}/lead_time.npy")
     return data
 
-def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, config_name: str="test"):
+def generate_prod_capacity(dist: tuple, num_data: int, config_name: str="test"):
     # To generate production capacity for each agent
-    if dist == 'uniform':
-        data = np.random.uniform(low=lb, high=ub, size=num_data)
-    elif dist == 'constant':
-        mean = (lb + ub)//2
-        data = np.array([mean for _ in range(num_data)])
+    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
+    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
+    
+    if dist[0] == 'uniform':
+        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data)
+    elif dist[0] == 'constant':
+        data = np.array([dist[1] for _ in range(num_data)])
     else:
         raise AssertionError("Prod capacity function is not implemented.")
     
@@ -31,12 +33,15 @@ def generate_prod_capacity(dist: str, num_data: int, lb: int=20, ub: int=40, con
     return data
 
 
-def generate_profit_rates(dist: str, num_data: int, lb=0, ub=1, config_name: str="test"):
+def generate_profit_rates(dist: tuple, num_data: int, config_name: str="test"):
     # To generate profit rate for agents to decide price based on cost
-    if dist == "uniform":
-        data = 1 + np.random.uniform(low=lb, high=ub, size=num_data)
-    elif dist == 'constant':
-        mean = 1 + (lb + ub)/2
+    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
+    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
+
+    if dist[0] == "uniform":
+        data = 1 + np.random.uniform(low=dist[1], high=dist[2], size=num_data)
+    elif dist[0] == 'constant':
+        mean = 1 + dist[1]
         data = np.array([mean for _ in range(num_data)])
     else:
         raise AssertionError("Profit rate function is not implemented.")
@@ -56,14 +61,14 @@ def generate_prod_cost(dist: str, num_data: int, lb=5, ub=15, config_name: str="
     save_array(data, f"env/{config_name}/prod_cost.npy")
     return data
 
-def generate_cost_price(dist: str, num_stages: int, num_agents_per_stage: int, config_name: str="test"):
+def generate_cost_price(prod_cost_dist: str, profit_rate_dist: tuple, num_stages: int, num_agents_per_stage: int, config_name: str="test"):
 
     # price = total cost * profit rate
     # cost = order cost + production cost
     num_total_agents = num_stages * num_agents_per_stage
 
-    all_profit_rate = generate_profit_rates(dist=dist, num_data=num_total_agents, config_name=config_name)
-    all_prod_costs = generate_prod_cost(dist=dist, num_data=num_total_agents, config_name=config_name)
+    all_profit_rate = generate_profit_rates(dist=profit_rate_dist, num_data=num_total_agents, config_name=config_name)
+    all_prod_costs = generate_prod_cost(dist=prod_cost_dist, num_data=num_total_agents, config_name=config_name)
 
     all_sale_prices = []
     all_order_costs = []

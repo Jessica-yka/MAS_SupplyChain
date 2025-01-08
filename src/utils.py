@@ -6,6 +6,11 @@ import matplotlib.pyplot as plt
 import re
 import json
 
+def save_string_to_file(data: str, save_path: str, t: int):
+    print("Saving data to: ", f"env/{save_path}/chat_summary_period{t}.txt")
+    with open(f"results/{save_path}/chat_summary_period{t}.txt", 'w') as f:
+        f.write(data)
+
 def save_dict_to_json(data: dict, save_path: str):
     print("Saving config to: ", f"env/{save_path}/config.json")
     with open(f"env/{save_path}/config.json", 'w') as f:
@@ -154,9 +159,9 @@ def random_relations(n_cand: int, n_relation: int):
 
 def get_state_description(state):
 
-    suppliers = " ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
-    non_suppliers = " ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
-    lead_times = " ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
+    suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
+    non_suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
+    lead_times = "; ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
     arriving_delieveries = []
 
     for i, _ in enumerate(state['suppliers']):

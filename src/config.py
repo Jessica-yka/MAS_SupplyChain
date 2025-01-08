@@ -35,18 +35,18 @@ env_configs = {
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 1,
         "num_init_customers": 1,
-        "num_agents_per_stage": 6, # >= 2
-        "num_periods": 15, 
+        "num_agents_per_stage": 4, # >= 2
+        "num_periods": 6, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": "uniform", # constant/uniform/etc
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
         "lead_time_dist": "uniform", # constant/uniform
-        "prod_capacity_dist": "uniform", # constant/uniform
+        "prod_capacity_dist": ("uniform", 10, 20), # constant/uniform
         "demand_fn": "constant_demand", # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
-        "profit_rate_dist": "uniform", 
+        "profit_rate_dist": ("uniform", 0, 1), 
     }
 }
 
@@ -62,7 +62,8 @@ def get_env_configs(env_configs: dict):
         generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, \
                                    num_suppliers=env_configs["num_init_suppliers"], num_customers=env_configs["num_init_customers"])
     order_costs, sale_prices = \
-        generate_cost_price(dist=env_configs["price_cost_dist"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=env_configs["config_name"])
+        generate_cost_price(prod_cost_dist=env_configs["price_cost_dist"], profit_rate_dist=env_configs["profit_rate_dist"], \
+                            num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=env_configs["config_name"])
     holding_costs = \
         generate_holding_costs(dist=env_configs["holding_costs_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     backlog_costs = \
