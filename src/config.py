@@ -8,16 +8,37 @@ from utils import generate_cost_price, generate_sup_dem_relations
 from utils import generate_holding_costs, generate_backlog_costs, generate_init_inventories
 from utils import generate_profit_rates
 from utils import Demand_fn
+from utils import clear_dir
 import os
 
 np.random.seed(0)
 
 env_configs = {
+    "test": {
+        "config_name": "test",
+        "sup_dem_relation_type": "random", # random/fixed
+        "num_init_suppliers": 1,
+        "num_init_customers": 1,
+        "num_agents_per_stage": 4, # >= 2
+        "num_periods": 16,
+        "num_stages": 4,
+        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
+        "init_inventory_dist": "constant", # constant/uniform/etc
+        "price_cost_dist": "constant", # constant/uniform/normal/etc
+        "lead_time_dist": "constant", # constant/uniform
+        "prod_capacity_dist": "constant", # constant/uniform
+        "demand_fn": "constant_demand", # constant/functional
+        "holding_costs_dist": "constant",
+        "backlog_costs_dist": "constant",
+        "profit_rate_dist": "constant",
+    },
     "basic": {
         "config_name": "basic",
-        "sup_dem_relation_type": "single", # single/multiple
+        "sup_dem_relation_type": "random", # random/fixed
+        "num_init_suppliers": 1,
+        "num_init_customers": 1,
         "num_agents_per_stage": 2, # >= 2
-        "num_periods": 6, 
+        "num_periods": 8, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": "uniform", # constant/uniform/etc
@@ -32,16 +53,16 @@ env_configs = {
 }
 
 def get_env_configs(env_configs: dict):
-    # create the dir to store the results
-    os.makedirs(f"env/{env_configs['config_name']}", exist_ok=True)
-
+    
+    
     num_stages = env_configs["num_stages"]
     num_agents_per_stage = env_configs["num_agents_per_stage"]
     num_periods = env_configs["num_periods"]
     num_total_agents = num_stages * num_agents_per_stage
     
     supply_relations, demand_relations = \
-        generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage)
+        generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, \
+                                   num_suppliers=env_configs["num_init_suppliers"], num_customers=env_configs["num_init_customers"])
     order_costs, sale_prices = \
         generate_cost_price(dist=env_configs["price_cost_dist"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=env_configs["config_name"])
     holding_costs = \

@@ -12,8 +12,9 @@ from gymnasium import spaces
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from config import env_configs, get_env_configs
-
-from utils import visualize_state, parse_stage_agent_id
+from utils import visualize_state, parse_stage_agent_id, clear_dir
+from utils import generate_sup_dem_relations
+import os
 
 np.random.seed(0)
 
@@ -231,15 +232,16 @@ class InventoryManagementEnv(MultiAgentEnv):
             states["recent_sales"][:, :, -t:] = self.sales[:, :, 1:(t + 1)]
 
         states["arriving_deliveries"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, lt_max), dtype=int)
+        # print("\n\nupdate status, arriving orders\n", self.arriving_orders)
         for m in range(self.num_stages):
             for x in range(self.num_agents_per_stage):
                 for j in range(self.num_agents_per_stage):
-                    if self.supply_relations[m][x][j] == 1:
-                        lt = self.lead_times[m][x][j]
-                        if t >= lt:
-                            states["arriving_deliveries"][m, x, j, -lt:] = self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
-                        elif t > 0:
-                            states["arriving_deliveries"][m, x, j, -t:] = self.arriving_orders[m, x, j, 1:(t + 1)]
+                    # if self.supply_relations[m][x][j] == 1:
+                    lt = self.lead_times[m][x][j]
+                    if t >= lt:
+                        states["arriving_deliveries"][m, x, j, -lt:] = self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
+                    elif t > 0:
+                        states["arriving_deliveries"][m, x, j, -t:] = self.arriving_orders[m, x, j, 1:(t + 1)]
 
         # self.state_dict = {f"stage_{m}_agent_{x}": states[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         self.state_dict = {}
@@ -248,7 +250,7 @@ class InventoryManagementEnv(MultiAgentEnv):
                 agent_state = []
                 agent_state.append(states["prod_capacities"][m][x])
                 agent_state.append(states["sale_prices"][m][x])
-                agent_state.append(states["order_costs"][m][x])
+                agent_state.append(states["order_costs"][m])
                 agent_state.append(states["backlog_costs"][m][x])
                 agent_state.append(states["holding_costs"][m][x])
                 agent_state.append(states["lead_times"][m][x])
@@ -290,11 +292,10 @@ class InventoryManagementEnv(MultiAgentEnv):
         # I_{m,t} <- I_{m,t-1} + R_{m,t-L_m} (after delivery)
         for m in range(self.num_stages):
             for i in range(self.num_agents_per_stage):
-                for j in range(self.num_agents_per_stage):
-                    if self.supply_relations[m][i][j] == 1:
-                        lt = self.lead_times[m][i][j]
-                        if t >= lt:
-                            current_inventories[m][i] += self.arriving_orders[m, i, j, t - lt] # the order placed before the lead time
+                for j in range(self.num_agents_per_stage):                    
+                    lt = self.lead_times[m][i][j]
+                    if t >= lt:
+                        current_inventories[m][i] += self.arriving_orders[m, i, j, t - lt] # the order placed before the lead time
 
         # Compute the fulfilled orders
         # R_{m,t} = min(B_{m+1,t-1} + O_{m,t}, I_{m+1,t-1} + R_{m+1,t-L_{m+1}}, c_{m+1}), m = 0, ..., M - 2
@@ -305,14 +306,14 @@ class InventoryManagementEnv(MultiAgentEnv):
             self.prod_capacities[1:])
         # R_{M-1,t} = O_{M-1,t}
         fulfilled_orders[M - 1] = cum_req_orders[M - 1] # the manufacturers at the top of supply chain
-        fulfilled_rates = fulfilled_orders / cum_req_orders
+        fulfilled_rates = (fulfilled_orders+1e-10) / (cum_req_orders+1e-10)
         fulfilled_rates = np.repeat(fulfilled_rates[:, np.newaxis, :], self.num_agents_per_stage, axis=1)
-        self.arriving_orders[:, :, :, t] = self.orders[:, :, :, t] * fulfilled_rates
-        
+        self.arriving_orders[:, :, :, t] = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
+
         # Compute the sales
-        cum_arriving_orders = np.sum(self.arriving_orders, axis=2)
+        cum_fulfilled_orders = np.sum(self.arriving_orders, axis=1) # M * N * T -> the total orders fulfilled by stage m + 1 at time t
         # S_{m,t} = R_{m-1,t}, m = 1, ..., M - 1
-        self.sales[1:, :, t] = cum_arriving_orders[:-1, :, t]
+        self.sales[1:, :, t] = cum_fulfilled_orders[:-1, :, t]
         # S_{0,t} = min(B_{0,t-1} + D_{t}, I_{0,t-1} + R_{0,t-L_m}, c_0)
 
         self.sales[0, :, t] = np.minimum(
@@ -348,7 +349,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         truncations = {f"stage_{m}_agent_{x}": False for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         truncations["__all__"] = False
         infos = {f"stage_{m}_agent_{x}": {} for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
-
+        
+        # print("arriving orders in step", self.arriving_orders)
         # Update the state
         self.update_state()
 
@@ -423,10 +425,17 @@ def env_creator(env_config):
 
 if __name__ == '__main__':
 
-    config_name = 'basic'
+    config_name = 'test'
+    # create the dir to store the results
+    os.makedirs(f"results/{config_name}", exist_ok=True)
+    clear_dir(f"results/{config_name}")
+    # create the dir to store the env setup
+    os.makedirs(f"env/{config_name}", exist_ok=True)
+    clear_dir(f"env/{config_name}")
     ec = get_env_configs(env_configs[config_name])
     im_env = env_creator(env_config=ec)
     im_env.reset()
+    
     print(f"stage_names = {im_env.stage_names}")
     print(f"state_dict = {im_env.state_dict}")
     print(f"state_dict = {im_env.parse_state(im_env.state_dict)}")
@@ -440,26 +449,24 @@ if __name__ == '__main__':
     num_agents_per_stage = im_env.num_agents_per_stage
 
     for t in range(im_env.num_periods):
-        print("period", t)
+        print('-' * 80)
+        print(f"period = {t}")
         sup_dict = {}
         dem_dict = {}
+        supply_relations, demand_relations = generate_sup_dem_relations(type=env_configs[config_name]["sup_dem_relation_type"], \
+                                                                        num_customers=env_configs[config_name]["num_init_customers"], num_suppliers=env_configs[config_name]["num_init_suppliers"], \
+                                                                        num_stages=im_env.num_stages, num_agents_per_stage=im_env.num_agents_per_stage)
         for m in range(im_env.num_stages):
             for x in range(im_env.num_agents_per_stage):
                 if m == 0: # retailer
-                    sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                    sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
-                    dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                    dem_dict[f"stage_{m}_agent_{x}"][0] = 1
+                    sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
+                    dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
                 elif m == im_env.num_stages - 1: # manufacturer
-                    sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                    sup_dict[f"stage_{m}_agent_{x}"][0] = 1
-                    dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                    dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
+                    sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
+                    dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
                 else:
-                    sup_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                    sup_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
-                    dem_dict[f"stage_{m}_agent_{x}"] = np.zeros(im_env.num_agents_per_stage, dtype=int)
-                    dem_dict[f"stage_{m}_agent_{x}"][(t+x+1)%num_agents_per_stage] = 1
+                    sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
+                    dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
 
         next_state_dict, rewards, terminations, truncations, infos = im_env.step(
             order_dict={f"stage_{m}_agent_{x}": np.array([4 for _ in range(num_agents_per_stage)]) for m in range(im_env.num_stages) for x in range(im_env.num_agents_per_stage)}, 
@@ -467,13 +474,14 @@ if __name__ == '__main__':
             dem_dict=dem_dict
         )
         
-        print('-' * 80)
-        print(f"period = {t}")
-        print(f"next_state_dict = {next_state_dict}")
-        print(f"next_state_dict = {im_env.parse_state(next_state_dict)}")
-        print(f"rewards = {rewards}")
-        print(f"terminations = {terminations}")
-        print(f"truncations = {truncations}")
-        print(f"infos = {infos}")
+        
+        # print(f"next_state_dict = {next_state_dict}")
+        # print(f"next_state_dict = {im_env.parse_state(next_state_dict)}")
+        # print(f"rewards = {rewards}")
+        # print(f"terminations = {terminations}")
+        # print(f"truncations = {truncations}")
+        # print(f"infos = {infos}")
         visualize_state(env=im_env, rewards=rewards, t=t, save_prefix=config_name)
-
+        if np.any(im_env.backlogs[1:, :, t]< 0) :
+            print("backlogs become negative")
+            break
