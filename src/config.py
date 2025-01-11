@@ -36,14 +36,14 @@ env_configs = {
         "num_init_suppliers": 1,
         "num_init_customers": 1,
         "num_agents_per_stage": 4, # >= 2
-        "num_periods": 6, 
+        "num_periods": 8, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": "uniform", # constant/uniform/etc
+        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": "uniform", # constant/uniform
+        "lead_time_dist": ("uniform", 1, 5), # constant/uniform
         "prod_capacity_dist": ("uniform", 10, 20), # constant/uniform
-        "demand_fn": "constant_demand", # constant/functional
+        "demand_fn": ("constant_demand", 5), # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
@@ -84,7 +84,7 @@ def get_env_configs(env_configs: dict):
         'num_stages': num_stages,
         'num_periods': num_periods,
         'num_agents_per_stage': num_agents_per_stage,
-        "demand_dist": env_configs["demand_fn"],
+        "demand_dist": env_configs["demand_fn"][0],
         'init_inventories': init_inventories, # num_stages * num_agents_per_stage
         'lead_times': lead_times, # num_stages * num_agents_per_stage * num_agents_per_stage
         'demand_fn': demand_fn,

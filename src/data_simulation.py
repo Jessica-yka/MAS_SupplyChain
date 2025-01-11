@@ -4,12 +4,15 @@ import re
 from utils import save_array, extract_pairs
 from utils import random_relations
 
-def generate_lead_time(dist: str, num_stages: int, num_agents_per_stage: int, lb=2, ub=8, config_name: str="test"):
+def generate_lead_time(dist: tuple, num_stages: int, num_agents_per_stage: int, config_name: str="test"):
+    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
+    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
+    
     # To generate lead time for each agent
-    if dist == 'uniform':
-        data = np.random.uniform(low=lb, high=ub, size=(num_stages, num_agents_per_stage, num_agents_per_stage))
-    elif dist == "constant":
-        mean = (lb + ub)//2
+    if dist[0] == 'uniform':
+        data = np.random.uniform(low=dist[1], high=dist[2], size=(num_stages, num_agents_per_stage, num_agents_per_stage))
+    elif dist[0] == "constant":
+        mean = dist[1]
         data = [mean for _ in range(num_stages * num_agents_per_stage * num_agents_per_stage)]
         data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage)
     else:
@@ -175,27 +178,37 @@ def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5, confi
     return data
     
 
-def generate_init_inventories(dist: str, num_data: int, lb: int=10, ub: int=18, config_name: str="test"):
-
-    if dist == "constant":
-        mean = (lb+ub)//2
+def generate_init_inventories(dist: tuple, num_data: int, config_name: str="test"):
+    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
+    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
+    
+    if dist[0] == "constant":
+        mean = dist[1]
         data = np.array([mean for _ in range(num_data)])
-    elif dist == 'uniform':
-        data = np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist[0] == 'uniform':
+        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data)
     else:
         raise AssertionError("init inventories is not implemented")
     
     save_array(data, f"env/{config_name}/init_inventories.npy")
     return data
 
-
 class Demand_fn:
 
-    def __init__(self, dist: str, lb: int=2, ub: int=8, mean: int=4):
-        self.dist = dist
-        self.lb = lb
-        self.ub = ub
-        self.mean = mean
+    def __init__(self, dist: tuple):
+        assert len(dist) == 3 if dist[0] == 'uniform_demand' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
+        assert len(dist) == 2 if dist[0] == 'constant_demand' else 1, "Please provide the mean value for the constant distribution."
+    
+        self.dist = dist[0]
+        if self.dist == 'uniform_demand':
+            self.lb = dist[1]
+            self.ub = dist[2]
+            self.mean = None
+        elif self.dist == 'constant_demand':
+            self.mean = dist[1]
+            self.lb = None
+            self.ub = None
+
         self.period = -1
 
     def constant_demand(self):

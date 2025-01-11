@@ -52,12 +52,17 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
         action_sup_dict = {}
         action_dem_dict = {}
         total_chat_summary = ""
+        
         for stage in range(num_stages):
             for agent in range(num_agents_per_stage):
                 stage_state = state_dict[f'stage_{stage}_agent_{agent}']
-
+                if period > 0:
+                    past_req_orders = all_action_order_dicts[period][f'stage_{stage}_agent_{agent}']
+                else:
+                    past_req_orders = []
                 message, state_info = generate_msg(stage=stage, agent=agent, stage_state=stage_state, im_env=im_env, \
-                                       action_order_dict=action_order_dict, period=period)
+                                       action_order_dict=action_order_dict, past_req_orders=past_req_orders, \
+                                       period=period)
                 chat_result = user_proxy.initiate_chat(
                     stage_agents[stage*num_agents_per_stage+agent],
                     message={'content': ''.join(message)},
@@ -70,19 +75,19 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
                 api_cost += chat_result.cost['usage_including_cached_inference']['total_cost']
                 # print(chat_summary)
                 match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
-                
+                print(match)
                 sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
                 if stage < num_stages - 1:
-                    remove_sup = match[0]                
+                    remove_sup = match[0].replace(" ", "")                
                     if remove_sup != "":
                         remove_sup = remove_sup.replace("agent", "")
-                        remove_sup = [int(ind) for ind in remove_sup.split(", ")]
+                        remove_sup = [int(ind) for ind in remove_sup.split(",")]
                         for ind in remove_sup:
                             sup_action[ind] = 0
-                    add_sup = match[1]
+                    add_sup = match[1].replace(" ", "")   
                     if add_sup != "":
                         add_sup = add_sup.replace("agent", "")
-                        add_sup = [int(ind) for ind in add_sup.split(", ")]
+                        add_sup = [int(ind) for ind in add_sup.split(",")]
                         for ind in add_sup:
                             sup_action[ind] = 1
                 action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action

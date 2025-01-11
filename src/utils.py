@@ -157,7 +157,7 @@ def random_relations(n_cand: int, n_relation: int):
     return np.random.choice(a=n_cand, size=n_relation, replace=False)
 
 
-def get_state_description(state, state_idx: int):
+def get_state_description(state, past_req_orders):
 
     suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
     non_suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
@@ -166,9 +166,14 @@ def get_state_description(state, state_idx: int):
     for i, _ in enumerate(state['suppliers']):
         if state['suppliers'][i] == 1:
             arriving_delieveries.append(f"from agent{i}: {state['deliveries'][i][-state['lead_times'][i]:]}")
-    order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
-
     arriving_delieveries = " ".join(arriving_delieveries)
+    order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
+    req_orders = []
+    for i, _ in enumerate(past_req_orders):
+        if past_req_orders[i] != 0:
+            req_orders.append(f"from agent{i}: {past_req_orders[i]}")
+    req_orders = " ".join(req_orders)
+    print("req orders", req_orders)
 
     return (
         f" - Lead Time: {lead_times} round(s)\n"
@@ -177,6 +182,7 @@ def get_state_description(state, state_idx: int):
         f" - Current Backlog (you owing to the downstream): {state['backlog']} unit(s)\n"
         f" - Upstream Backlog (your upstream owing to you): {state['upstream_backlog']} unit(s)\n"
         f" - Previous Sales (in the recent round(s), from old to new): {state['sales']}\n"
+        f" - In the last round, you placed orders to upstream suppliers: {req_orders}\n"
         f" - Arriving Deliveries (in this and the next round(s), from near to far): {arriving_delieveries}\n"
         f" - Your upstream suppliers are: {suppliers}\n" 
         f" - Other upstream suppliers are: {non_suppliers}\n"
@@ -185,7 +191,7 @@ def get_state_description(state, state_idx: int):
 
 def get_demand_description(demand_fn: str) -> str:
     if demand_fn == "constant_demand":
-        return "The expected demand at the retailer (stage 1) is a constant 4 units for all rounds."
+        return "The expected demand at the retailer (stage 1) is a constant 5 units for all rounds."
     elif demand_fn == "uniform_demand":
         return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for all rounds."
     elif demand_fn == "larger_demand":
