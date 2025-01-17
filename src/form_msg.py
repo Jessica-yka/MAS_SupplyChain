@@ -27,17 +27,23 @@ gold_rule_msg = (
     "Anticipate future demand changes and adjust your orders accordingly to maintain a stable inventory level.\n\n"
 )
     
-def generate_msg(im_env, action_order_dict: dict, past_req_orders: list, stage_state: dict, period: int, stage: int, agent: int):
+def generate_msg(im_env, action_order_dict: dict, past_req_orders: list, stage_state: dict, period: int, stage: int, cur_agent_idx: int):
 
     if stage != 0:
-        downstream_order = f"Your downstream order from the stage {stage} for this round is {action_order_dict[f'stage_{stage - 1}_agent_{agent}']}. "
+        down_order = []
+        for down_agent_idx in range(im_env.num_agents_per_stage):
+            dr = action_order_dict[f'stage_{stage - 1}_agent_{down_agent_idx}'][cur_agent_idx]
+            if dr != 0:
+                down_order.append(f"from agent{down_agent_idx}: {dr}")
+        down_order = "; ".join(down_order)
+        downstream_order = f"Your downstream order from the agents at stage {stage-1} for this round is: {down_order}. "
     else:
         downstream_order = ""
 
     demand_description = get_demand_description(im_env.demand_dist)
     message = (
         f"Now this is the round {period + 1}, "
-        f"and you are at the stage {stage + 1}: {im_env.stage_names[stage]} in the supply chain. "
+        f"and you are at the stage {stage}: {im_env.stage_names[stage]} in the supply chain. "
         f"Given your current state:\n{get_state_description(stage_state, past_req_orders)}\n\n"
     )
     state_info = message

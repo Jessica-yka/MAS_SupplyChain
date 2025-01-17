@@ -166,14 +166,17 @@ def get_state_description(state, past_req_orders):
     for i, _ in enumerate(state['suppliers']):
         if state['suppliers'][i] == 1:
             arriving_delieveries.append(f"from agent{i}: {state['deliveries'][i][-state['lead_times'][i]:]}")
-    arriving_delieveries = " ".join(arriving_delieveries)
+    arriving_delieveries = "; ".join(arriving_delieveries)
     order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
     req_orders = []
-    for i, _ in enumerate(past_req_orders):
-        if past_req_orders[i] != 0:
-            req_orders.append(f"from agent{i}: {past_req_orders[i]}")
-    req_orders = " ".join(req_orders)
-    print("req orders", req_orders)
+    if len(past_req_orders) == 0:
+        req_orders = "None"
+    else:
+        for i, _ in enumerate(past_req_orders):
+            if past_req_orders[i] != 0:
+                req_orders.append(f"from agent{i}: {past_req_orders[i]}")
+        req_orders = " ".join(req_orders)
+    # print("req orders", req_orders)
 
     return (
         f" - Lead Time: {lead_times} round(s)\n"

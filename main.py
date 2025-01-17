@@ -31,7 +31,7 @@ config_list = llm_config_list
 # %% [markdown]
 # ## Creating the Environment
 
-# %%
+# %%req orders 
 env_config_name = "basic"
 # create the dir to store the results
 os.makedirs(f"results/{env_config_name}", exist_ok=True)

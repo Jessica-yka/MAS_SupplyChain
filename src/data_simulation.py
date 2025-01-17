@@ -10,11 +10,11 @@ def generate_lead_time(dist: tuple, num_stages: int, num_agents_per_stage: int, 
     
     # To generate lead time for each agent
     if dist[0] == 'uniform':
-        data = np.random.uniform(low=dist[1], high=dist[2], size=(num_stages, num_agents_per_stage, num_agents_per_stage))
+        data = np.random.uniform(low=dist[1], high=dist[2], size=(num_stages, num_agents_per_stage, num_agents_per_stage)).astype(int)
     elif dist[0] == "constant":
         mean = dist[1]
         data = [mean for _ in range(num_stages * num_agents_per_stage * num_agents_per_stage)]
-        data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage)
+        data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage).astype(int)
     else:
         raise AssertionError("Lead time function is not implemented.")
     save_array(data, f"env/{config_name}/lead_time.npy")
@@ -26,9 +26,9 @@ def generate_prod_capacity(dist: tuple, num_data: int, config_name: str="test"):
     assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
     
     if dist[0] == 'uniform':
-        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data)
+        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data).astype(int)
     elif dist[0] == 'constant':
-        data = np.array([dist[1] for _ in range(num_data)])
+        data = np.array([dist[1] for _ in range(num_data)]).astype(int)
     else:
         raise AssertionError("Prod capacity function is not implemented.")
     
@@ -184,9 +184,9 @@ def generate_init_inventories(dist: tuple, num_data: int, config_name: str="test
     
     if dist[0] == "constant":
         mean = dist[1]
-        data = np.array([mean for _ in range(num_data)])
+        data = np.array([mean for _ in range(num_data)]).astype(int)
     elif dist[0] == 'uniform':
-        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data)
+        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data).astype(int)
     else:
         raise AssertionError("init inventories is not implemented")
     

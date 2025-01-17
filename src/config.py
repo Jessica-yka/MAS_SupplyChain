@@ -36,6 +36,24 @@ env_configs = {
         "num_init_suppliers": 1,
         "num_init_customers": 1,
         "num_agents_per_stage": 4, # >= 2
+        "num_periods": 2, 
+        "num_stages": 4,
+        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
+        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
+        "price_cost_dist": "uniform", # constant/uniform/normal/etc
+        "lead_time_dist": ("uniform", 1, 5), # constant/uniform
+        "prod_capacity_dist": ("uniform", 10, 20), # constant/uniform
+        "demand_fn": ("constant_demand", 5), # constant/functional
+        "holding_costs_dist": "constant", 
+        "backlog_costs_dist": "constant", 
+        "profit_rate_dist": ("uniform", 0, 1), 
+    }, 
+    "large_graph_test": {
+        "config_name": "large_graph_test",
+        "sup_dem_relation_type": "random", # random/fixed
+        "num_init_suppliers": 1,
+        "num_init_customers": 1,
+        "num_agents_per_stage": 20, # >= 2
         "num_periods": 8, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],

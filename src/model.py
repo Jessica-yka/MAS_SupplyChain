@@ -60,7 +60,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
                     past_req_orders = all_action_order_dicts[period][f'stage_{stage}_agent_{agent}']
                 else:
                     past_req_orders = []
-                message, state_info = generate_msg(stage=stage, agent=agent, stage_state=stage_state, im_env=im_env, \
+                message, state_info = generate_msg(stage=stage, cur_agent_idx=agent, stage_state=stage_state, im_env=im_env, \
                                        action_order_dict=action_order_dict, past_req_orders=past_req_orders, \
                                        period=period)
                 chat_result = user_proxy.initiate_chat(
