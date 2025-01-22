@@ -36,7 +36,7 @@ env_configs = {
         "num_init_suppliers": 1,
         "num_init_customers": 1,
         "num_agents_per_stage": 4, # >= 2
-        "num_periods": 2, 
+        "num_periods": 8, 
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
@@ -51,8 +51,8 @@ env_configs = {
     "large_graph_test": {
         "config_name": "large_graph_test",
         "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 1,
-        "num_init_customers": 1,
+        "num_init_suppliers": 3,
+        "num_init_customers": 3,
         "num_agents_per_stage": 20, # >= 2
         "num_periods": 8, 
         "num_stages": 4,
@@ -65,6 +65,7 @@ env_configs = {
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
+        "llm_agents": [(1, 1)]
     }
 }
 
@@ -96,6 +97,7 @@ def get_env_configs(env_configs: dict):
     #     generate_profit_rates(dist=env_configs["profit_rate_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     demand_fn = Demand_fn(dist=env_configs["demand_fn"])
     stage_names = env_configs["stage_names"]
+    llm_agents = env_configs["llm_agents"]
 
 
     return {
@@ -114,6 +116,7 @@ def get_env_configs(env_configs: dict):
         'supply_relations': supply_relations,
         "demand_relations": demand_relations,
         'stage_names': stage_names,
+        "llm_agents": llm_agents,
     }
     
 

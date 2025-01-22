@@ -15,8 +15,8 @@ from env import env_creator
 from config import env_configs, get_env_configs
 from llm_config import llm_config_list
 from openai import AzureOpenAI
-from model import create_agents
-from model import run_simulation
+from mas_model import create_agents
+from mas_model import run_simulation
 from utils import get_demand_description, get_state_description
 from utils import clear_dir
 np.random.seed(42)
@@ -32,7 +32,7 @@ config_list = llm_config_list
 # ## Creating the Environment
 
 # %%req orders 
-env_config_name = "basic"
+env_config_name = "large_graph_test"
 # create the dir to store the results
 os.makedirs(f"results/{env_config_name}", exist_ok=True)
 clear_dir(f"results/{env_config_name}")
@@ -72,15 +72,16 @@ stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_p
 
 # %%
 rewards = []
-for _ in tqdm(range(1)):
+for _ in tqdm(range(10)):
     stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list':config_list})
     reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name)
     rewards.append(reward)
     print(f"rewards = {rewards}")
 
-# mean_reward = np.mean(rewards)
-# std_reward = np.std(rewards)
+mean_reward = np.mean(rewards)
+std_reward = np.std(rewards)
 
-# print(f"Rewards: {rewards}")
-# print(f"Mean Episode Reward: {mean_reward}")
-# print(f"Standard Deviation of Episode Reward: {std_reward}")
+print(f"Rewards: {rewards}")
+print(f"Mean Episode Reward: {mean_reward}")
+print(f"Standard Deviation of Episode Reward: {std_reward}")
+

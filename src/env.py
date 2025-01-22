@@ -111,8 +111,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.order_costs = np.array(order_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.backlog_costs = np.array(backlog_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.holding_costs = np.array(holding_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
-        self.supply_relations = supply_relations
-        self.demand_relations = demand_relations
+        self.init_supply_relations = supply_relations
+        self.init_demand_relations = demand_relations
 
         # Create all variables
         self.period = 0
@@ -125,6 +125,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.profits = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.total_profits = np.zeros(self.num_periods + 1, dtype=int)
         self.lead_time_pad = np.zeros(shape=(self.num_stages, self.num_agents_per_stage), dtype=int)
+
 
         # Compute the upper bounds for state variables
         max_production = self.max_production
@@ -193,8 +194,11 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.profits.fill(0)
         self.total_profits.fill(0)
 
+
         # Set the initial condition and state
         self.inventories[:, :, 0] = self.init_inventories # (stage, agent, period)
+        self.supply_relations = self.init_supply_relations
+        self.demand_relations = self.init_demand_relations
         self.update_state()
 
         return self.state_dict, {}
@@ -420,6 +424,7 @@ def env_creator(env_config):
         supply_relations=env_config['supply_relations'],
         demand_relations=env_config['demand_relations'], 
         stage_names=env_config['stage_names'],
+        llm_agents=env_config['llm_agents'],
     )
 
 

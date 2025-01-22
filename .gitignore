@@ -171,3 +171,5 @@ src/llm_config.py
 
 # conda env
 uist2025/
+
+.gitignore
