@@ -77,7 +77,9 @@ for _ in tqdm(range(5)):
     stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list':config_list})
     reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name)
     rewards.append(reward)
-    print(f"rewards = {rewards}")
+    print(f"rewards = {reward}")
+    # if reward < 0:
+    #     raise AssertionError("The rewards are negative")
 
 mean_reward = np.mean(rewards)
 std_reward = np.std(rewards)

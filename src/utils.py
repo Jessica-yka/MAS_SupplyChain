@@ -162,12 +162,12 @@ def get_state_description(state: dict, past_req_orders: list, G: nx.Graph, state
     if state_format == 'base':
         return get_base_description(state=state, past_req_orders=past_req_orders)
     elif state_format == "GraphML":
-        return get_GraphML_description(G=G, agent_name=agent_name, enable_graph_change=enable_graph_change)
+        return get_GraphML_description(G=G, agent_name=agent_name, enable_graph_change=enable_graph_change, state=state)
     else:
         raise AssertionError(f"{state_format} state description method not implemented yet")
 
 
-def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change: bool):
+def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change: bool, state: dict):
 
     # Convert to GraphML format
     # print(G.nodes())
@@ -181,7 +181,8 @@ def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change:
         customer_nodes = [customer for node, customer in G.edges(agent_name) if G.edges[node, customer].get("supplier")]
         sub_graph = G.subgraph(supplier_nodes + customer_nodes + [agent_name])
     graphml_str = '\n'.join(list(nx.generate_graphml(sub_graph, named_key_ids=True, prettyprint=True))[12:])
-    return graphml_str
+    recent_sales = f"\nPrevious Sales (in the recent round(s), from old to new): {state['sales']}\n"
+    return graphml_str + recent_sales
 
 
 def get_base_description(state, past_req_orders):

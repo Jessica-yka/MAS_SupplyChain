@@ -72,7 +72,7 @@ env_configs = {
         "profit_rate_dist": ("uniform", 0, 1), 
         "llm_agents": [(1, 1)],
         "enable_graph_change": False, 
-        "state_format": "base", 
+        "state_format": "GraphML", 
     }
 }
 

@@ -103,19 +103,22 @@ class SupplyChain_Graph():
                 backlog = agent_state["backlog"]
                 upstream_backlog = agent_state["upstream_backlog"]
                 deliveries = agent_state["deliveries"]
+                inventory = agent_state["inventory"]
                 pr_orders = past_req_orders.get(f"stage_{i}_agent_{j}", [])
 
-                 
+                self.G.nodes[f"stage_{i}_agent_{j}"]["inventory"] = inventory
                 self.G.nodes[f"stage_{i}_agent_{j}"]['backlog'] = backlog
                 self.G.nodes[f"stage_{i}_agent_{j}"]['upstream_backlog'] = upstream_backlog
-                # self.G.nodes[f"stage_{i}_agent_{j}"]['sales'] = sales 
+                self.G.nodes[f"stage_{i}_agent_{j}"]['sales'] = sales[-1] 
  
                 if i < self.num_stages - 1:
                     for k in range(self.num_agents_per_stage): # to upstream suppliers except the manufacturers
                         # add new directional edge for indicating delivery
                         if sum(deliveries[k]):
-                            self.G.add_edge(f"stage_{i+1}_agent_{k}", f"stage_{i}_agent_{j}")
-                            self.G[f"stage_{i+1}_agent_{k}"][f"stage_{i}_agent_{j}"]['deliveries'] = sum(deliveries[k])
+                            for day in range(len(deliveries[k])):
+                                if deliveries[k][-day] > 0:        
+                                    self.G.add_edge(f"stage_{i+1}_agent_{k}", f"stage_{i}_agent_{j}")
+                                    self.G[f"stage_{i+1}_agent_{k}"][f"stage_{i}_agent_{j}"][f'deliveries in {day} days'] = deliveries[k][-day]
 
                     if len(pr_orders) > 0:
                         for k in range(self.num_agents_per_stage):      

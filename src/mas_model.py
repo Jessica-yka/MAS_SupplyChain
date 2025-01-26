@@ -11,6 +11,7 @@ from utils import extract_pairs
 from form_msg import generate_msg
 from utils import visualize_state, save_string_to_file
 
+np.random.seed(0)
 
 def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config) -> List[ConversableAgent]:
     agents = []
@@ -117,18 +118,31 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
                         stage_order_action = np.zeros(num_agents_per_stage, dtype=int)
                         match = match[0]
                         if match:
+                            print("match", match)
                             supplier_order_dict = extract_pairs(match)
+                            print("supplier order dict", supplier_order_dict)
                             for i in range(num_agents_per_stage):
-                                stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0)
+                                stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0) + supplier_order_dict.get(f"stage_{stage+1}_agent_{i}", 0)
+                        
                         action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
+                        print("stage_order_action", stage_order_action)
+                        if sum(stage_order_action)==0:
+                            raise AssertionError("order action not recorded")
                 else:
                     sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
                     action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
-                    stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
+                    # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
+                    if stage == 0:
+                        stage_order_action = np.random.uniform(1, 3, num_agents_per_stage).astype(int) * sup_action
+                    elif stage == num_stages - 1:
+                        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
+                        stage_order_action = sup_action * avg_order.astype(int) * 3
+                    else:
+                        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
+                        stage_order_action = sup_action * avg_order.astype(int)
                     action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
 
-                    
-                
+
         save_string_to_file(data=total_chat_summary, save_path=config_name, t=period)
         next_states, rewards, terminations, truncations, infos = im_env.step(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict)
         next_state_dict = im_env.parse_state(next_states)

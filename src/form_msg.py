@@ -22,6 +22,7 @@ gold_rule_msg = (
     "You can only place order to your upstream suppliers. "
     "Please consider the lead time and place your order in advance. "
     "Please consider the lead time and order costs when selecting your suppliers. "
+    "Please consider the recent sales when deciding the order quantity. "
     "Remember that your upstream has its own lead time, so do not wait until your inventory runs out. "
     "Also, avoid ordering too many units at once. "
     "Try to spread your orders over multiple rounds to prevent the bullwhip effect. "
