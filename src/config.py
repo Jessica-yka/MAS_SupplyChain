@@ -29,15 +29,17 @@ env_configs = {
         "holding_costs_dist": "constant",
         "backlog_costs_dist": "constant",
         "profit_rate_dist": "constant",
+        "llm_agents": None,
+        "state_format": "base", 
     },
     "basic": {
         "config_name": "basic",
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 1,
-        "num_init_customers": 1,
-        "num_agents_per_stage": 4, # >= 2
-        "num_periods": 8, 
+        "num_init_customers": 1, 
         "num_stages": 4,
+        "num_agents_per_stage": 4, # >= 2
+        "num_periods": 8,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
@@ -47,6 +49,9 @@ env_configs = {
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
+        "llm_agents": [(i, j) for i in range(4) for j in range(4)],
+        "state_format": "base", 
+        "enable_graph_change": True, 
     }, 
     "large_graph_test": {
         "config_name": "large_graph_test",
@@ -65,7 +70,9 @@ env_configs = {
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
-        "llm_agents": [(1, 1)]
+        "llm_agents": [(1, 1)],
+        "enable_graph_change": False, 
+        "state_format": "base", 
     }
 }
 
@@ -98,7 +105,8 @@ def get_env_configs(env_configs: dict):
     demand_fn = Demand_fn(dist=env_configs["demand_fn"])
     stage_names = env_configs["stage_names"]
     llm_agents = env_configs["llm_agents"]
-
+    state_format = env_configs["state_format"]
+    enable_graph_change = env_configs["enable_graph_change"]
 
     return {
         'num_stages': num_stages,
@@ -117,6 +125,8 @@ def get_env_configs(env_configs: dict):
         "demand_relations": demand_relations,
         'stage_names': stage_names,
         "llm_agents": llm_agents,
+        "state_format": state_format, 
+        "enable_graph_change": enable_graph_change,
     }
     
 

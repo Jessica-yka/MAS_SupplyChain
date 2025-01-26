@@ -5,6 +5,7 @@ import networkx as nx
 import matplotlib.pyplot as plt
 import re
 import json
+import dgl
 
 def save_string_to_file(data: str, save_path: str, t: int):
     print("Saving data to: ", f"env/{save_path}/chat_summary_period{t}.txt")
@@ -157,7 +158,33 @@ def random_relations(n_cand: int, n_relation: int):
     return np.random.choice(a=n_cand, size=n_relation, replace=False)
 
 
-def get_state_description(state, past_req_orders):
+def get_state_description(state: dict, past_req_orders: list, G: nx.Graph, state_format: str, enable_graph_change: bool, agent_name: str=None):
+    if state_format == 'base':
+        return get_base_description(state=state, past_req_orders=past_req_orders)
+    elif state_format == "GraphML":
+        return get_GraphML_description(G=G, agent_name=agent_name, enable_graph_change=enable_graph_change)
+    else:
+        raise AssertionError(f"{state_format} state description method not implemented yet")
+
+
+def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change: bool):
+
+    # Convert to GraphML format
+    # print(G.nodes())
+    # print(G.edges())
+    if enable_graph_change:
+        connected_nodes = list(G.successors(agent_name)) + list(G.predecessors(agent_name)) + [agent_name]
+        sub_graph = G.subgraph(connected_nodes)
+    else:
+        # Get nodes that have a "suppliers" relation with the given agent
+        supplier_nodes = [supplier for node, supplier in G.edges(agent_name) if G.edges[node, supplier].get('customer')]
+        customer_nodes = [customer for node, customer in G.edges(agent_name) if G.edges[node, customer].get("supplier")]
+        sub_graph = G.subgraph(supplier_nodes + customer_nodes + [agent_name])
+    graphml_str = '\n'.join(list(nx.generate_graphml(sub_graph, named_key_ids=True, prettyprint=True))[12:])
+    return graphml_str
+
+
+def get_base_description(state, past_req_orders):
 
     suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
     non_suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
@@ -209,4 +236,3 @@ def get_demand_description(demand_fn: str) -> str:
         raise KeyError(f"Error: {demand_fn} not implemented.")
   
 
-  

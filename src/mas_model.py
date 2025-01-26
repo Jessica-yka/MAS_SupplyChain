@@ -31,7 +31,7 @@ def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config)
     return agents
 
 def run_simulation(im_env, user_proxy, stage_agents, config_name):
-   
+    
     all_state_dicts = {}
     all_action_order_dicts = {}
     all_action_sup_dicts = {}
@@ -39,14 +39,24 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
     all_reward_dicts = {}
     episode_reward = 0
     api_cost = 0
+    # print("reset")
     im_env.reset()
     num_stages = im_env.num_stages
     num_agents_per_stage = im_env.num_agents_per_stage
-    llm_agent_set = im_env.llm_agents
+    llm_agent_set = im_env.llm_agent_set
+    enable_graph_change = im_env.enable_graph_change
     visualize_state(env=im_env, rewards={}, t=-1, save_prefix=config_name)
     
     for period in range(im_env.num_periods):
+        # retrieve the latest env info
         state_dict = im_env.parse_state(im_env.state_dict)
+        if period > 0:
+            past_req_orders = all_action_order_dicts[period]
+        else:
+            past_req_orders = dict()
+        # update the nx supply chain graph with the latest env
+        im_env.sc_graph.update_graph(state_dict=state_dict, past_req_orders=past_req_orders) 
+
         all_state_dicts[period] = state_dict
         action_order_dict = {}
         action_sup_dict = {}
@@ -55,15 +65,12 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
         
         for stage in range(num_stages):
             for agent in range(num_agents_per_stage):
-                if (stage, agent) in llm_agent_set: # just test the llm's performance on decision-making
+                if (stage, agent) in llm_agent_set: # just to have only a few agents in the environment to be controlled by LLM
                     stage_state = state_dict[f'stage_{stage}_agent_{agent}']
-                    if period > 0:
-                        past_req_orders = all_action_order_dicts[period][f'stage_{stage}_agent_{agent}']
-                    else:
-                        past_req_orders = []
-                    message, state_info = generate_msg(stage=stage, cur_agent_idx=agent, stage_state=stage_state, im_env=im_env, \
-                                        action_order_dict=action_order_dict, past_req_orders=past_req_orders, \
-                                        period=period)
+                    pr_orders = past_req_orders.get(f'stage_{stage}_agent_{agent}', [])
+                    message, state_info = generate_msg(enable_graph_change=enable_graph_change, stage=stage, cur_agent_idx=agent, stage_state=stage_state, im_env=im_env, \
+                                        action_order_dict=action_order_dict, past_req_orders=pr_orders, period=period)
+                                        
                     chat_result = user_proxy.initiate_chat(
                         stage_agents[stage*num_agents_per_stage+agent],
                         message={'content': ''.join(message)},
@@ -77,35 +84,43 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
                     # print(chat_summary)
                     match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
 
-                    sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
-                    if stage < num_stages - 1:
-                        remove_sup = match[0].replace(" ", "")                
-                        if remove_sup != "":
-                            remove_sup = remove_sup.replace("agent", "")
-                            remove_sup = [int(ind) for ind in remove_sup.split(",")]
-                            for ind in remove_sup:
-                                sup_action[ind] = 0
-                        add_sup = match[1].replace(" ", "")   
-                        if add_sup != "":
-                            add_sup = add_sup.replace("agent", "")
-                            add_sup = [int(ind) for ind in add_sup.split(",")]
-                            for ind in add_sup:
-                                sup_action[ind] = 1
-                    action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
-                    
-                    stage_order_action = np.zeros(num_agents_per_stage, dtype=int)
-                    if stage < num_stages - 1:
-                        match2 = match[2]
-                    else:
-                        match2 = match[0]
-                    if match2:
-                        supplier_order_dict = extract_pairs(match2)
-                        for i in range(num_agents_per_stage):
-                            stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0)
-                    action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
+                    if enable_graph_change:
+                        sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
+                        if stage < num_stages - 1:
+                            remove_sup = match[0].replace(" ", "")                
+                            if remove_sup != "":
+                                remove_sup = remove_sup.replace("agent", "").replace('"', "")
+                                remove_sup = [int(ind) for ind in remove_sup.split(",")]
+                                for ind in remove_sup:
+                                    sup_action[ind] = 0
+                            add_sup = match[1].replace(" ", "")   
+                            if add_sup != "":
+                                add_sup = add_sup.replace("agent", "").replace('"', "")
+                                add_sup = [int(ind) for ind in add_sup.split(",")]
+                                for ind in add_sup:
+                                    sup_action[ind] = 1
+                        action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
 
-                    # print("action sup action", sup_action)
-                    # print("action order action", stage_order_action)
+                        stage_order_action = np.zeros(num_agents_per_stage, dtype=int)
+                        if stage < num_stages - 1:
+                            match2 = match[2]
+                        else:
+                            match2 = match[0]
+                        if match2:
+                            supplier_order_dict = extract_pairs(match2)
+                            for i in range(num_agents_per_stage):
+                                stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0)
+                        action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
+                    else:
+                        sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
+                        action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
+                        stage_order_action = np.zeros(num_agents_per_stage, dtype=int)
+                        match = match[0]
+                        if match:
+                            supplier_order_dict = extract_pairs(match)
+                            for i in range(num_agents_per_stage):
+                                stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0)
+                        action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
                 else:
                     sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
                     action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
@@ -123,7 +138,8 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name):
         all_action_dem_dicts[period + 1] = action_dem_dict
         all_reward_dicts[period + 1] = rewards
         # episode_reward += sum(rewards.values())
-        episode_reward += rewards[f'stage_1_agent_1']
+        for (stage, agent) in im_env.llm_agent_set:
+            episode_reward += rewards[f'stage_{stage}_agent_{agent}']
         # print(
         #     f"period = {period}, action_order_dict = {action_order_dict}, rewards = {rewards}, episode_reward = {episode_reward}, " \
         #     f"api_cost = {api_cost}")

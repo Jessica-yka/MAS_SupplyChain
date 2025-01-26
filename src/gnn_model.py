@@ -5,12 +5,12 @@ import torch as th
 import torch.nn as nn
 import torch.nn.functional as F
 from dgl import DGLGraph
-import time
 import numpy as np
 from sklearn.model_selection import train_test_split
 import random
-from dgl.data import CoraGraphDataset
-
+from sc_graph import create_agent_profiles
+from config import env_configs, get_env_configs
+import os
 
 gcn_msg = fn.copy_u(u='h', out='m')
 gcn_reduce = fn.sum(msg='m', out='h')
@@ -47,28 +47,31 @@ class Net(nn.Module):
 net = Net()
 
 
-def load_sc_data(agent_profiles, num_stage: int=4):
+def load_sc_graph_data(agent_profiles, num_stage: int, num_agent_per_stage: int):
     
-    node_feat_dict = {}
-    edge_feat_dict = {}
-    pos_labels = [] # (sup, dem)
-    neg_labels = [] # (sup, dem)
-
+    node_feats = []
+    edge_feats = []
+    g = dgl.DGLGraph()
+    node_labels = []
+    edge_u, edge_v = [], []
+    ndata = len(agent_profiles)
     for ap in agent_profiles:
-        sup_agent_idx = f"stage_{stage}_agent_{agent}"
-        node_feat_dict[sup_agent_idx] = ap.get_node_features()
+        node_labels.append(ap.name)
+        node_features = ap.get_node_features()
+        node_feats.append(th.tensor(node_features, dtype=th.float32))  # Ensure features are float type
+        
         stage = ap.stage
         agent = ap.agent
         if stage < num_stage - 1:            
             for dem, label in enumerate(ap.suppliers):
-                dem_agent_idx = f"stage_{stage-1}_agent_{dem}"
                 if label == 1:
-                    pos_labels.append((sup_agent_idx, dem_agent_idx))
-                else: # label is 0 
-                    neg_labels.append((sup_agent_idx, dem_agent_idx))
+                    edge_u.append(stage*num_agent_per_stage+agent)
+                    edge_v.append((stage-1)*num_agent_per_stage+dem)
 
-    labels = pos_labels + neg_labels
-    return node_feat_dict, edge_feat_dict, labels
+    g.add_nodes(ndata)
+    g.add_edges(edge_u, edge_v)
+    g.ndata['feat'] = th.tensor(node_feats)
+    return g, g.ndata['feat']
 
 
 
@@ -109,24 +112,34 @@ def train_link_predictor(g, features, pos_edges, neg_edges, epochs=50, lr=1e-2):
 
         print(f"Epoch {epoch:05d} | Loss {loss.item():.4f}")
 
-# Example usage with Cora dataset
-g, features, labels, train_mask, test_mask = load_sc_data()
-u, v = g.edges()
-eids = np.arange(g.number_of_edges())
-eids = np.random.permutation(eids)
-test_size = int(len(eids) * 0.1)
-train_size = g.number_of_edges() - test_size
-train_pos_u, train_pos_v = u[eids[:train_size]], v[eids[:train_size]]
-test_pos_u, test_pos_v = u[eids[train_size:]], v[eids[train_size:]]
 
-train_neg_u = np.random.choice(g.number_of_nodes(), train_size)
-train_neg_v = np.random.choice(g.number_of_nodes(), train_size)
-test_neg_u = np.random.choice(g.number_of_nodes(), test_size)
-test_neg_v = np.random.choice(g.number_of_nodes(), test_size)
+if __name__ == "__main__":
 
-train_pos_edges = (train_pos_u, train_pos_v)
-train_neg_edges = (train_neg_u, train_neg_v)
-test_pos_edges = (test_pos_u, test_pos_v)
-test_neg_edges = (test_neg_u, test_neg_v)
+    env_config_name = "large_graph_test"
+    os.makedirs(f"env/{env_config_name}", exist_ok=True)
+    env_config = get_env_configs(env_configs=env_configs[env_config_name])
+    print(env_config.keys())
+    agent_profiles = create_agent_profiles(env_config)
 
-train_link_predictor(g, features, train_pos_edges, train_neg_edges)
+    # Example usage with Cora dataset
+    g, features = load_sc_graph_data(agent_profiles=agent_profiles, num_stage=env_config['num_stages'], num_agent_per_stage=env_config['num_agents_per_stage'])
+    print("edges", g.edges())
+    u, v = g.edges()
+    eids = np.arange(g.number_of_edges())
+    eids = np.random.permutation(eids)
+    test_size = int(len(eids) * 0.1)
+    train_size = g.number_of_edges() - test_size
+    train_pos_u, train_pos_v = u[eids[:train_size]], v[eids[:train_size]]
+    test_pos_u, test_pos_v = u[eids[train_size:]], v[eids[train_size:]]
+
+    train_neg_u = np.random.choice(g.number_of_nodes(), train_size)
+    train_neg_v = np.random.choice(g.number_of_nodes(), train_size)
+    test_neg_u = np.random.choice(g.number_of_nodes(), test_size)
+    test_neg_v = np.random.choice(g.number_of_nodes(), test_size)
+
+    train_pos_edges = (train_pos_u, train_pos_v)
+    train_neg_edges = (train_neg_u, train_neg_v)
+    test_pos_edges = (test_pos_u, test_pos_v)
+    test_neg_edges = (test_neg_u, test_neg_v)
+
+    train_link_predictor(g, features, train_pos_edges, train_neg_edges)

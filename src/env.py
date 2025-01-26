@@ -15,6 +15,8 @@ from config import env_configs, get_env_configs
 from utils import visualize_state, parse_stage_agent_id, clear_dir
 from data_simulation import generate_sup_dem_relations
 import os
+import copy
+from sc_graph import create_agent_profiles, SupplyChain_Graph
 
 np.random.seed(0)
 
@@ -47,8 +49,9 @@ class InventoryManagementEnv(MultiAgentEnv):
 
     def __init__(
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
-        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list,
-        supply_relations: dict, demand_relations: dict, stage_names: list, init_seed: int = 0):
+        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list, state_format: str,
+        supply_relations: dict, demand_relations: dict, stage_names: list, sc_graph: SupplyChain_Graph, agent_profiles: list, enable_graph_change: bool, 
+        llm_agents: list=None, init_seed: int = 0):
         """
         Initialize the inventory management environment
 
@@ -113,6 +116,11 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.holding_costs = np.array(holding_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.init_supply_relations = supply_relations
         self.init_demand_relations = demand_relations
+        self.llm_agent_set = llm_agents
+        self.state_format = state_format
+        self.agent_profiles = agent_profiles
+        self.sc_graph = sc_graph
+        self.enable_graph_change = enable_graph_change
 
         # Create all variables
         self.period = 0
@@ -124,7 +132,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demands = np.zeros(self.num_periods + 1, dtype=int)
         self.profits = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.total_profits = np.zeros(self.num_periods + 1, dtype=int)
-        self.lead_time_pad = np.zeros(shape=(self.num_stages, self.num_agents_per_stage), dtype=int)
 
 
         # Compute the upper bounds for state variables
@@ -197,8 +204,9 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         # Set the initial condition and state
         self.inventories[:, :, 0] = self.init_inventories # (stage, agent, period)
-        self.supply_relations = self.init_supply_relations
-        self.demand_relations = self.init_demand_relations
+        self.supply_relations = copy.deepcopy(self.init_supply_relations)
+        self.demand_relations = copy.deepcopy(self.init_demand_relations)
+        self.sc_graph.reset_G()
         self.update_state()
 
         return self.state_dict, {}
@@ -287,8 +295,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         t = self.period
         M = self.num_stages
         current_inventories = self.inventories[:, :, t - 1]
-        self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
+        self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         
         self.demands[t] = int(self.demand_fn(t))
@@ -367,8 +375,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         :param state: state
         :return: parsed state
         """
-        lt_max = self.max_lead_time
-
         return {
             'prod_capacity': state[0],
             'sale_price': state[1],
@@ -407,7 +413,9 @@ def env_creator(env_config):
     """
     Create the environment
     """
-
+    agent_profiles = create_agent_profiles(env_config=env_config)
+    sc_graph = SupplyChain_Graph(agent_profiles=agent_profiles, num_stages=env_config["num_stages"], num_agents_per_stage=env_config["num_agents_per_stage"])
+    
     return InventoryManagementEnv(
         num_stages=env_config['num_stages'],
         num_agents_per_stage=env_config['num_agents_per_stage'],
@@ -425,12 +433,16 @@ def env_creator(env_config):
         demand_relations=env_config['demand_relations'], 
         stage_names=env_config['stage_names'],
         llm_agents=env_config['llm_agents'],
+        state_format=env_config['state_format'],
+        enable_graph_change=env_config["enable_graph_change"], 
+        agent_profiles=agent_profiles,
+        sc_graph = sc_graph,
     )
 
 
 if __name__ == '__main__':
 
-    config_name = 'basic'
+    config_name = 'large_graph_test'
     # create the dir to store the results
     os.makedirs(f"results/{config_name}", exist_ok=True)
     clear_dir(f"results/{config_name}")
