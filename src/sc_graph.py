@@ -76,7 +76,7 @@ class SupplyChain_Graph():
 
         for ag in agent_profiles:
             G.add_node(ag.name, prod_capacity=ag.prod_capacity, sale_price=ag.sale_price, sales=ag.sales, 
-                inventory=ag.inventory, backlog=ag.backlog, backlog_cost=ag.backlog_cost)
+                inventory=ag.inventory, backlog=ag.backlog, backlog_cost=ag.backlog_cost, stage=ag.stage)
             
         for ag in agent_profiles:
             if ag.role == "manufacturer":
@@ -105,6 +105,7 @@ class SupplyChain_Graph():
                 deliveries = agent_state["deliveries"]
                 inventory = agent_state["inventory"]
                 pr_orders = past_req_orders.get(f"stage_{i}_agent_{j}", [])
+                suppliers = agent_state["suppliers"]
 
                 self.G.nodes[f"stage_{i}_agent_{j}"]["inventory"] = inventory
                 self.G.nodes[f"stage_{i}_agent_{j}"]['backlog'] = backlog
@@ -124,4 +125,12 @@ class SupplyChain_Graph():
                         for k in range(self.num_agents_per_stage):      
                             if pr_orders[k] > 0:
                                 self.G[f"stage_{i}_agent_{j}"][f"stage_{i+1}_agent_{k}"]['past_req_orders'] = pr_orders[k]
+                    
+                    for k, label in enumerate(suppliers):
+                        if label == 1:
+                            self.G.add_edge(f"stage_{i+1}_agent_{k}", f"stage_{i}_agent_{j}", supplier=True)
+                            self.G.add_edge(f"stage_{i}_agent_{j}", f"stage_{i+1}_agent_{k}", customer=True)
+                        else: # label == 0
+                            self.G.add_edge(f"stage_{i+1}_agent_{k}", f"stage_{i}_agent_{j}", supplier=False)
+                            self.G.add_edge(f"stage_{i}_agent_{j}", f"stage_{i+1}_agent_{k}", customer=False)
 

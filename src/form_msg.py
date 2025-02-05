@@ -1,8 +1,8 @@
 from utils import get_state_description, get_demand_description  
 
 task1_msg = (
-    "Task1: Do you want to remove anyone given your upstream supplier list?\n"
-    "Please state your reason in 1-2 sentences first "
+    "Task1: Do you want to remove anyone from your upstream supplier list?\n"
+    "Please consider the lead time and order cost when making decision. State your reason in 1-2 sentences first "
     "and then provide your action as a list following this format (e.g., [0, 1] for removing agent0 and agent1 as suppliers, [] for doing nothing)\n") 
 task2_msg = (
     "Task2: Do you want to add anyone as your new supplier(s) given other available upstream suppliers in the environment?\n"
@@ -11,11 +11,11 @@ task2_msg = (
 )
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round? You can only place orders to your upstream suppliers\n"
-    "Please state your reason in 1-2 sentences first "
+    "Please consider the lead time and order cost when making decision. State your reason in 1-2 sentences first "
     "and then provide your action as a list following this format. E.g.,[(\"agent0\": 4), (\"agent1\": 2)].\n"
 )
 gold_rule_msg = (
-    "Please follow the output format strictly. "
+    "Please follow the output format strictly. \n"
     "Golden rule of this game: Open orders should always equal to \"expected downstream orders + backlog\". "
     "If open orders are larger than this, the inventory will rise (once the open orders arrive). "
     "If open orders are smaller than this, the backlog will not go down and it may even rise. "
@@ -27,6 +27,14 @@ gold_rule_msg = (
     "Also, avoid ordering too many units at once. "
     "Try to spread your orders over multiple rounds to prevent the bullwhip effect. "
     "Anticipate future demand changes and adjust your orders accordingly to maintain a stable inventory level.\n\n"
+)
+least_lead_time = (
+    "Task: Which upstream company has the least lead time to you? "
+    "Provide the answer in brackets (e.g., [agent4])."
+)
+lowest_order_cost = (
+    "Task: Which upstream company has the lowest order cost? "
+    "Provide the answer in brackets (e.g., [agent5])."
 )
     
 def generate_msg(im_env, enable_graph_change: bool, action_order_dict: dict, past_req_orders: list, stage_state: dict, period: int, stage: int, cur_agent_idx: int):
@@ -57,18 +65,45 @@ def generate_msg(im_env, enable_graph_change: bool, action_order_dict: dict, pas
 
     state_info = message
 
-    if stage == im_env.num_stages - 1 or not enable_graph_change: # do not ask for upstream orders for the manufacturer
-        num_tasks = 1
-        message += f"There are {num_tasks} tasks for you to make decision\n\n"
-        message += f"{task3_msg}\n"
-    else:
-        num_tasks = 3
-        message += f"There are {num_tasks} tasks for you to make decision\n\n"
-        message += f"{task1_msg}\n"
-        message += f"{task2_msg}\n"
-        message += f"{task3_msg}\n"
-
-    message += f"{gold_rule_msg}\n"
+    message += get_lead_time_task()
+    message += get_order_cost_task()
+    # message += get_decision_task(stage=stage, im_env=im_env, enable_graph_change=enable_graph_change)
     
     return message, state_info
+
+
+def get_lead_time_task():
+
+    task_msg = "\nPlease answer the question based on your understanding of the given supply chain network.\n"
+    task_msg += least_lead_time
+
+    return task_msg
+
+
+def get_order_cost_task():
+
+    task_msg = "\nPlease answer the question based on your understanding of the given supply chain network.\n"
+    task_msg += lowest_order_cost
+
+    return task_msg
+
+
+def get_decision_task(stage: int, im_env, enable_graph_change: bool):
+
+    task_msg = ""
+    if stage == im_env.num_stages - 1 or not enable_graph_change: # do not ask for upstream orders for the manufacturer
+        num_tasks = 1
+        task_msg += f"There are {num_tasks} tasks for you to make decision\n\n"
+        task_msg += f"{task3_msg}\n"
+    else:
+        num_tasks = 3
+        task_msg += f"There are {num_tasks} tasks for you to make decision\n\n"
+        task_msg += f"{task1_msg}\n"
+        task_msg += f"{task2_msg}\n"
+        task_msg += f"{task3_msg}\n"
+
+    task_msg += f"{gold_rule_msg}\n"
+
+    return task_msg
+
 

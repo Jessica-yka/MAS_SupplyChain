@@ -59,7 +59,7 @@ env_configs = {
         "num_init_suppliers": 3,
         "num_init_customers": 3,
         "num_agents_per_stage": 20, # >= 2
-        "num_periods": 8, 
+        "num_periods": 8,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
@@ -71,8 +71,8 @@ env_configs = {
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
         "llm_agents": [(1, 1)],
-        "enable_graph_change": False, 
-        "state_format": "GraphML", 
+        "enable_graph_change": True, 
+        "state_format": "base", 
     }
 }
 

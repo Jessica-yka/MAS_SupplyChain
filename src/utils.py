@@ -7,9 +7,9 @@ import re
 import json
 import dgl
 
-def save_string_to_file(data: str, save_path: str, t: int):
-    print("Saving data to: ", f"env/{save_path}/chat_summary_period{t}.txt")
-    with open(f"results/{save_path}/chat_summary_period{t}.txt", 'w') as f:
+def save_string_to_file(data: str, save_path: str, t: int, round: int, reward: int):
+    print("Saving data to: ", f"results/{save_path}/chat_summary_round{round}_period{t}_reward{reward}.txt")
+    with open(f"results/{save_path}/chat_summary_round{round}_period{t}.txt", 'w') as f:
         f.write(data)
 
 def save_dict_to_json(data: dict, save_path: str):
@@ -173,7 +173,10 @@ def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change:
     # print(G.nodes())
     # print(G.edges())
     if enable_graph_change:
-        connected_nodes = list(G.successors(agent_name)) + list(G.predecessors(agent_name)) + [agent_name]
+        upstream_nodes = [up for up in G.successors(agent_name) if G.nodes[up].get("stage")==G.nodes[agent_name].get("stage")+1]
+        customer_nodes = [customer for node, customer in G.edges(agent_name) if G.edges[node, customer].get("supplier")]
+
+        connected_nodes = upstream_nodes + customer_nodes + [agent_name]
         sub_graph = G.subgraph(connected_nodes)
     else:
         # Get nodes that have a "suppliers" relation with the given agent
@@ -181,6 +184,7 @@ def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change:
         customer_nodes = [customer for node, customer in G.edges(agent_name) if G.edges[node, customer].get("supplier")]
         sub_graph = G.subgraph(supplier_nodes + customer_nodes + [agent_name])
     graphml_str = '\n'.join(list(nx.generate_graphml(sub_graph, named_key_ids=True, prettyprint=True))[12:])
+
     recent_sales = f"\nPrevious Sales (in the recent round(s), from old to new): {state['sales']}\n"
     return graphml_str + recent_sales
 
@@ -237,3 +241,44 @@ def get_demand_description(demand_fn: str) -> str:
         raise KeyError(f"Error: {demand_fn} not implemented.")
   
 
+def no_backlog_env_proxy(state_dict: dict, stage: int, agent: int, num_stages: int, num_agents_per_stage: int, action_order_dict: dict, action_sup_dict: dict):
+
+    sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
+    action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
+    # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
+    if stage == 0:
+        stage_order_action = np.random.uniform(1, 3, num_agents_per_stage).astype(int) * sup_action
+    elif stage == num_stages - 1:
+        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
+        stage_order_action = sup_action * avg_order.astype(int) * 3
+    else:
+        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
+        stage_order_action = sup_action * avg_order.astype(int)
+    action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
+
+    return action_sup_dict, action_order_dict
+
+
+def update_sup_action(sup_action: list, rm_match: str, add_match: str):
+    
+    remove_sup = rm_match.replace(" ", "")                
+    if remove_sup != "":
+        remove_sup = remove_sup.replace("agent", "").replace('"', "")
+        try:
+            remove_sup = [int(ind) for ind in remove_sup.split(",")]
+            for ind in remove_sup:
+                sup_action[ind] = 0
+        except: # if the string format is invalid
+            pass
+    add_sup = add_match.replace(" ", "")   
+    if add_sup != "":
+        add_sup = add_sup.replace("agent", "").replace('"', "")
+        try:
+            add_sup = [int(ind) for ind in add_sup.split(",")]
+            for ind in add_sup:
+                sup_action[ind] = 1
+        except:
+            pass
+    
+    return sup_action
+    

@@ -72,10 +72,10 @@ stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_p
 
 # %%
 rewards = []
-for _ in tqdm(range(5)):
+for r in tqdm(range(5)):
     print("\n\nNew round starts")
     stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list':config_list})
-    reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name)
+    reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name, round=r)
     rewards.append(reward)
     print(f"rewards = {reward}")
     # if reward < 0:
