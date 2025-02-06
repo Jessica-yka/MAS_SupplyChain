@@ -32,6 +32,10 @@ def create_agents(stage_names: List[str], num_agents_per_stage: int, llm_config)
         
     return agents
 
+def create_new_agent_event(stage: int, agent: int):
+    pass
+
+
 def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
     
     all_state_dicts = {}
@@ -80,11 +84,11 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                         clear_history=False,
                     )
                     chat_summary = chat_result.summary
-                    total_chat_summary += (state_info + chat_summary + '\n\n\n\n')
+                    total_chat_summary += (message + chat_summary + '\n\n\n\n')
                     api_cost += chat_result.cost['usage_including_cached_inference']['total_cost']
                     # print(chat_summary)
                     match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
-                    exit()
+
                     if enable_graph_change:
                         sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
                         if stage < num_stages - 1:
@@ -157,6 +161,6 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         print(f"api_cost = {api_cost}")
         print('=' * 80)
         visualize_state(env=im_env, rewards=rewards, t=period, save_prefix=config_name)
-        save_string_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=rewards)
+        save_string_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=episode_reward)
 
     return episode_reward

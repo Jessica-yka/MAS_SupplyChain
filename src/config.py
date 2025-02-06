@@ -58,22 +58,43 @@ env_configs = {
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 3,
         "num_init_customers": 3,
-        "num_agents_per_stage": 20, # >= 2
+        "num_agents_per_stage": [100 for _ in 4], # >= 2
         "num_periods": 8,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 1, 5), # constant/uniform
-        "prod_capacity_dist": ("uniform", 10, 20), # constant/uniform
-        "demand_fn": ("constant_demand", 5), # constant/functional
+        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
+        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
+        "demand_fn": ("constant_demand", 10), # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
         "llm_agents": [(1, 1)],
         "enable_graph_change": True, 
         "state_format": "base", 
-    }
+    },
+    "large_graph_normal_demand_test": {
+        "config_name": "large_graph_test",
+        "sup_dem_relation_type": "random", # random/fixed
+        "num_init_suppliers": 3,
+        "num_init_customers": 3,
+        "num_agents_per_stage": [20, 50, 80, 100], # >= 2
+        "num_periods": 8,
+        "num_stages": 4,
+        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
+        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
+        "price_cost_dist": "uniform", # constant/uniform/normal/etc
+        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
+        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
+        "demand_fn": ("normal_demand", 10, 3), # constant/functional
+        "holding_costs_dist": "constant", 
+        "backlog_costs_dist": "constant", 
+        "profit_rate_dist": ("uniform", 0, 1), 
+        "llm_agents": [(0, 1)],
+        "enable_graph_change": True, 
+        "state_format": "base", 
+    },
 }
 
 def get_env_configs(env_configs: dict):
@@ -82,7 +103,7 @@ def get_env_configs(env_configs: dict):
     num_stages = env_configs["num_stages"]
     num_agents_per_stage = env_configs["num_agents_per_stage"]
     num_periods = env_configs["num_periods"]
-    num_total_agents = num_stages * num_agents_per_stage
+    num_total_agents = sum(num_agents_per_stage)
     
     supply_relations, demand_relations = \
         generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, \

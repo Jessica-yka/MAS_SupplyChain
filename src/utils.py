@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import re
 import json
 import dgl
+from typing import Callable
+
 
 def save_string_to_file(data: str, save_path: str, t: int, round: int, reward: int):
     print("Saving data to: ", f"results/{save_path}/chat_summary_round{round}_period{t}_reward{reward}.txt")
@@ -99,6 +101,52 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
     plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="jpg")
 
 
+def draw_material_flow(env, t: int, save_prefix: str):
+    num_stages = env.num_stages
+    num_agents_per_stage = env.num_agents_per_stage
+    sup_rel = env.arriving_orders[:, :, :, t]
+    save_path = f'results/{save_prefix}/'
+
+    M = nx.DiGraph()
+
+    # Add nodes for each set
+    stage_agents = []
+    for m in range(num_stages):
+        stage_agents = []
+        for x in range(num_agents_per_stage):
+            stage_agents.append(f"s{m}a{x}")
+        M.add_nodes_from(stage_agents, layer=num_stages-m)  # Add set A nodes
+
+    # Add edges between the sets
+    edges = []
+    edge_labels = {}
+    for m in range(num_stages-1):
+        for x in range(num_agents_per_stage):
+            for i in range(num_agents_per_stage):
+                if sup_rel[m][x][i] > 0:
+                    src = f"s{m+1}a{i}"
+                    tgt = f"s{m}a{x}"
+                    edges.append((src, tgt))
+                    edge_labels[(src, tgt)] = sup_rel[m][x][i]
+    M.add_edges_from(edges)
+
+
+    # Define positions for the multipartite layout
+    pos = nx.multipartite_layout(M, subset_key="layer")
+
+    # Draw the multipartite graph
+    # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
+    stage_colors = ["gold", "violet", "limegreen", "darkorange",]
+    colors = [stage_colors[m] for m in range(num_stages) for _ in range(num_agents_per_stage)]
+
+    plt.figure(figsize=(50, 40))
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=250, font_size=12, edge_color="gray", alpha=1)
+    nx.draw_networkx_edge_labels(G=M, pos=pos, edge_labels=edge_labels)
+    plt.title("Material Flow Graph")
+    plt.savefig(os.path.join(save_path, f"material_flow_period_{t}.jpg"), format="jpg")
+
+
+
 def visualize_state(env, rewards: dict, t: int, save_prefix: str):
     
     state_dict = env.state_dict
@@ -109,20 +157,20 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
     df = pd.DataFrame({
         "stage": {},
         "agent_idx": {}, 
+        "profits": {}, 
         "prod_capacity": {},
-        "sales_price": {},
-        "order_cost": {},
+        "inventory": {},
+        "sales_price": {},       
         "backlog_cost": {},
         "holding_cost": {},
-        "lead_time": {},
-        "inventory": {},
         "backlog": {}, 
         "upstream_backlog": {},
-        "recent_sales": {},
-        "deliveries": {},
         "suppliers": {},
         "customers": {},
-        "profits": {}
+        "order_cost": {},
+        "recent_sales": {},
+        "lead_time": {},
+        "deliveries": {},
     })
     for stage in range(num_stages):
         for agent in range(num_agents_per_stage):
@@ -145,13 +193,12 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
                     'deliveries': [state_dict[f'stage_{stage}_agent_{agent}'][12]],
                     'profits': [rewards.get(f'stage_{stage}_agent_{agent}', None)]
                     })], ignore_index=True)
-            
+    
     df = df.groupby(by=['stage', 'agent_idx']).apply(lambda x: x).reset_index(drop=True)
-
     os.makedirs(save_path, exist_ok=True)
     df.to_csv(os.path.join(save_path, f"env_period_{t}.csv"), index=False)
     draw_multipartite_graph(env=env, t=t, save_prefix=save_prefix)
-
+    draw_material_flow(env=env, t=t, save_prefix=save_prefix)
 
 def random_relations(n_cand: int, n_relation: int):
 
@@ -214,6 +261,7 @@ def get_base_description(state, past_req_orders):
         f" - Lead Time: {lead_times} round(s)\n"
         f" - Order costs: {order_costs} unit(s)\n"
         f" - Inventory Level: {state['inventory']} unit(s)\n"
+        f" - Production capacity: {state['prod_capacity']} unit(s)\n"
         f" - Current Backlog (you owing to the downstream): {state['backlog']} unit(s)\n"
         f" - Upstream Backlog (your upstream owing to you): {state['upstream_backlog']} unit(s)\n"
         f" - Previous Sales (in the recent round(s), from old to new): {state['sales']}\n"
@@ -224,18 +272,22 @@ def get_base_description(state, past_req_orders):
     )
 
 
-def get_demand_description(demand_fn: str) -> str:
-    if demand_fn == "constant_demand":
-        return "The expected demand at the retailer (stage 1) is a constant 5 units for all rounds."
-    elif demand_fn == "uniform_demand":
-        return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for all rounds."
-    elif demand_fn == "larger_demand":
-        return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 8} for all rounds."
-    elif demand_fn == "seasonal_demand":
-        return "The expected demand at the retailer (stage 1) is a discrete uniform distribution U{0, 4} for the first 4 rounds, " \
+def get_demand_description(demand_fn: Callable) -> str:
+    
+    if demand_fn.dist == "constant_demand":
+        mean = demand_fn.mean
+        return f"The expected demand at the retailer (stage 0) is a constant {mean} units for all rounds."
+    elif demand_fn.dist == "uniform_demand":
+        lb = demand_fn.lb
+        ub = demand_fn.ub
+        return f"The expected demand at the retailer (stage 0) is a discrete uniform distribution U{lb, ub} for all rounds."
+    elif demand_fn.dist == "seasonal_demand":
+        return f"The expected demand at the retailer (stage 0) is a discrete uniform distribution U{0, 4} for the first 4 rounds, " \
             "and a discrete uniform distribution U{5, 8} for the last 8 rounds."
-    elif demand_fn == "normal_demand":
-        return "The expected demand at the retailer (stage 1) is a normal distribution N(4, 2^2), " \
+    elif demand_fn.dist == "normal_demand":
+        mu = demand_fn.mean
+        std = demand_fn.std
+        return f"The expected demand at the retailer (stage 0) is a normal distribution N({mu}, {std}), " \
             "truncated at 0, for all 12 rounds."
     else:
         raise KeyError(f"Error: {demand_fn} not implemented.")
@@ -247,7 +299,7 @@ def no_backlog_env_proxy(state_dict: dict, stage: int, agent: int, num_stages: i
     action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
     # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
     if stage == 0:
-        stage_order_action = np.random.uniform(1, 3, num_agents_per_stage).astype(int) * sup_action
+        stage_order_action = np.random.uniform(2, 4, num_agents_per_stage).astype(int) * sup_action
     elif stage == num_stages - 1:
         avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
         stage_order_action = sup_action * avg_order.astype(int) * 3

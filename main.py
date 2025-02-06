@@ -32,7 +32,7 @@ config_list = llm_config_list
 # ## Creating the Environment
 
 # %%req orders 
-env_config_name = "large_graph_test"
+env_config_name = "large_graph_normal_demand_test"
 # create the dir to store the results
 os.makedirs(f"results/{env_config_name}", exist_ok=True)
 clear_dir(f"results/{env_config_name}")
@@ -47,7 +47,7 @@ im_env = env_creator(env_config)
 
 # %%
 print(env_config["demand_dist"])
-print(get_demand_description(env_config["demand_dist"]))
+print(get_demand_description(env_config["demand_fn"]))
 
 # %% [markdown]
 # ## Creating Agents
@@ -72,7 +72,7 @@ stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_p
 
 # %%
 rewards = []
-for r in tqdm(range(5)):
+for r in tqdm(range(1)):
     print("\n\nNew round starts")
     stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list':config_list})
     reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name, round=r)

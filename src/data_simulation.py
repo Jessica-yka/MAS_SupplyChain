@@ -198,16 +198,23 @@ class Demand_fn:
     def __init__(self, dist: tuple):
         assert len(dist) == 3 if dist[0] == 'uniform_demand' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
         assert len(dist) == 2 if dist[0] == 'constant_demand' else 1, "Please provide the mean value for the constant distribution."
-    
+        
+        self.lb = None
+        self.ub = None
+        self.mean = None
+        self.std = None
         self.dist = dist[0]
+        
         if self.dist == 'uniform_demand':
             self.lb = dist[1]
             self.ub = dist[2]
-            self.mean = None
+        if self.dist == "normal_demand":
+            self.mean = dist[1]
+            self.std = dist[2]
         elif self.dist == 'constant_demand':
             self.mean = dist[1]
-            self.lb = None
-            self.ub = None
+
+
 
         self.period = -1
 
@@ -216,6 +223,9 @@ class Demand_fn:
 
     def uniform_demand(self):
         return np.random.randint(low=self.lb, high=self.ub)
+    
+    def normal_demand(self):
+        return np.random.normal(self.mean, self.std)
         
     def __call__(self, t):
         self.period = t
@@ -223,6 +233,8 @@ class Demand_fn:
             return self.constant_demand()
         elif self.dist == "uniform_demand":
             return self.uniform_demand()
+        elif self.dist == "normal_demand":
+            return self.normal_demand()
         else:
             raise AssertionError("Demand function is not implemented.")
         
