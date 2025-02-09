@@ -77,9 +77,9 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
             if event == "sudden_shutdown":
                 print("There is a sudden shutdown event. ")
                 shutdown_list = im_env.shut_seq[period]
-                for (stage_id, agent_id) in shutdown_list:
-                    shutdown_list.append(f"stage_{stage_id}_agent_{agent_id}")
-                    state_dict = im_env.create_sudden_shutdown(stage_id, agent_id, state_dict)
+                for stage_id, agent_id in shutdown_list:
+                    state_dict = im_env.create_shutdown_event(stage_id, agent_id, state_dict)
+                    
                 # while True:
                 #     print("Input the stage and agent id to close the company. Press enter to close the session.")
                 #     input_stage_id = input("stage id (int)")
@@ -153,6 +153,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                             except:
                                 pass
                         action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action
+                        print("stage_order_action", stage_order_action)
                     else:
                         sup_action = state_dict[f'stage_{stage_id}_agent_{agent_id}']['suppliers']
                         action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action

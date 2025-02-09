@@ -57,8 +57,8 @@ env_configs = {
     "large_graph_test": {
         "config_name": "large_graph_test",
         "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 3,
-        "num_init_customers": 3,
+        "num_init_suppliers": 2,
+        "num_init_customers": 2,
         "num_agents_per_stage": 20, # >= 2
         "num_periods": 10,
         "num_stages": 4,
@@ -74,9 +74,9 @@ env_configs = {
         "llm_agents": [(1, 1)],
         "enable_graph_change": True, 
         "state_format": "base", 
-        "emergent_events": [(5, "demand_surge")], 
-        "shut_seq": {},
-        "rec_seq": {},
+        "emergent_events": [(5, "sudden_shutdown"), (7, "recovery")], 
+        "shut_seq": {5: [(2, 2), (2, 10), (2, 13)]},
+        "rec_seq": {7: [(2,2), (2,10)]},
     },
     "large_graph_normal_demand_test": {
         "config_name": "large_graph_test",

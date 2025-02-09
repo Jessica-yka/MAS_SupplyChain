@@ -303,7 +303,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
         self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
-        print(self.demand_fn(t))
         self.demands[t] = int(self.demand_fn(t))
         # Add the delivered orders
         # I_{m,t} <- I_{m,t-1} + R_{m,t-L_m} (after delivery)
@@ -326,6 +325,14 @@ class InventoryManagementEnv(MultiAgentEnv):
         fulfilled_rates = (fulfilled_orders+1e-10) / (cum_req_orders+1e-10)
         fulfilled_rates = np.repeat(fulfilled_rates[:, np.newaxis, :], self.num_agents_per_stage, axis=1)
         self.arriving_orders[:, :, :, t] = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
+        base_orders = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
+        remainder = self.orders[:, :, :, t] * fulfilled_rates - base_orders
+        remainder = np.sum(remainder, axis=1)
+        # print(remainder.shape)
+        # print(remainder[0, 1])
+        # print(self.arriving_orders[0, :, 1, t])
+        # exit()
+
 
         # Compute the sales
         cum_fulfilled_orders = np.sum(self.arriving_orders, axis=1) # M * N * T -> the total orders fulfilled by stage m + 1 at time t
@@ -419,13 +426,14 @@ class InventoryManagementEnv(MultiAgentEnv):
     def create_shutdown_event(self, stage_id: int, agent_id: int, state_dict: dict):
         print(f"Shutdown stage_{stage_id}_agent_{agent_id}. ")
         self.running_agents[stage_id][agent_id] = 0
+        # self.supply_relations[f"stage_{stage_id}_agent_{agent_id}"] = self.supply_relations[f"stage_{stage_id}_agent_{agent_id}"]
         # remove shutdown agents from the suppliers of each downstream agents
         if stage_id != 0: # has downstream customer
-            for agent_id in range(self.num_agents_per_stage):
-                state_dict[f"stage_{stage_id-1}_agent_{agent_id}"]["suppliers"][agent_id] = 0
+            for down_agent_id in range(self.num_agents_per_stage):
+                state_dict[f"stage_{stage_id-1}_agent_{down_agent_id}"]["suppliers"][agent_id] = 0
         # store newly shutdown agents in the list
         self.shutdown_agents_set.add(f"stage_{stage_id}_agent_{agent_id}")
-        # clear the inventory pf shutdown agents
+        # clear the inventory of shutdown agents
         self.inventories[stage_id, agent_id, self.period] = 0
 
         return state_dict

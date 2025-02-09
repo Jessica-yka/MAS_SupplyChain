@@ -10,9 +10,10 @@ task2_msg = (
     "Please state your reason in 1-2 sentences first "
     "and then provide your action as a list following this format (e.g., [2, 3] for adding agent2 and agent3 as suppliers, [] for doing nothing)\n"
 )
+# Please estimate the future downstream demand based on the recent sales, and consider the lead time and order cost when making decision. 
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round? You can only place orders to your upstream suppliers\n"
-    "Please estimate the future downstream demand based on the recent sales, and consider the lead time and order cost when making decision. State your reason in 1-2 sentences first "
+    "State your reason in 1-2 sentences first "
     "Please provide your action as a list following this format. E.g.,[(\"agent0\": 4), (\"agent1\": 2)].\n"
 )
 gold_rule_msg = (
@@ -46,29 +47,29 @@ def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_l
     
     agent_name = f"stage_{stage_id}_agent_{cur_agent_id}"
     message = (
-        f"Now this is the round {period + 1}, "
+        f"Now this is the round {period}, "
         f"and you are {agent_name} at the stage {stage_id}: {im_env.stage_names[stage_id]} in the supply chain. "
         )
     
     for event in im_env.emergent_events[im_env.period]:
         if event == "sudden_shutdown":
             shutdown_agents = []
-            for (stage_id, agent_id) in shutdown_list:
-                shutdown_agents.append(f"stage_{stage_id}_agent_{agent_id}")
+            for (st_stage_id, st_agent_id) in shutdown_list:
+                shutdown_agents.append(f"stage_{st_stage_id}_agent_{st_agent_id}")
             shutdown_agents = " ".join(shutdown_agents)
             shutdown_message = (
                 f"There is a sudden shutdown event. "
-                f"Those agent(s) are closed since now: {shutdown_agents}"
+                f"Those agent(s) are closed since now: {shutdown_agents}\n\n"
             )
             message += shutdown_message
         if event == "recovery":
             recovered_agents = []
-            for (stage_id, agent_id) in recovery_list:
-                recovered_agents.append(f"stage_{stage_id}_agent_{agent_id}")
+            for (rec_stage_id, rec_agent_id) in recovery_list:
+                recovered_agents.append(f"stage_{rec_stage_id}_agent_{rec_agent_id}")
             recovered_agents = " ".join(recovered_agents)
             recover_message = (
                 f"There is a recovery event. "
-                f"Those agent(s) are re-open since now: {recovered_agents}"
+                f"Those agent(s) are re-open since now: {recovered_agents}\n\n"
             )
             message += recover_message
     message += f"Given your current state:\n{get_state_description(state=stage_state, past_req_orders=past_req_orders, G=im_env.sc_graph.G, agent_name=agent_name, state_format=im_env.state_format, enable_graph_change=enable_graph_change)}\n\n"
@@ -122,11 +123,11 @@ def get_decision_task(stage: int, im_env, enable_graph_change: bool):
     task_msg = ""
     if stage == im_env.num_stages - 1 or not enable_graph_change: # do not ask for upstream orders for the manufacturer
         num_tasks = 1
-        task_msg += f"There are {num_tasks+1} tasks for you to make decision\n\n"
+        task_msg += f"There are {num_tasks} tasks for you to make decision\n\n"
         task_msg += f"{task3_msg}\n"
     else:
         num_tasks = 3
-        task_msg += f"There are {num_tasks+1} tasks for you to make decision\n\n"
+        task_msg += f"There are {num_tasks} tasks for you to make decision\n\n"
         task_msg += f"{task1_msg}\n"
         task_msg += f"{task2_msg}\n"
         # task_msg += f"{expected_demand}\n"

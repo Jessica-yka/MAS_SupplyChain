@@ -98,10 +98,10 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
     for m in range(num_stages):
         for x in range(num_agents_per_stage):
             if env.running_agents[m][x] == 0:
-                colors[m*num_stages+x] = "black"
+                colors[m*num_agents_per_stage+x] = "black"
 
-    plt.figure(figsize=(10, 8))
-    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=2500, font_size=12, edge_color="gray", alpha=1)
+    plt.figure(figsize=(50, 40))
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=100, font_size=12, edge_color="gray", alpha=1)
     plt.title("Multipartite Graph")
     plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="jpg")
 
@@ -145,7 +145,7 @@ def draw_material_flow(env, t: int, save_prefix: str):
     colors = [stage_colors[m] for m in range(num_stages) for _ in range(num_agents_per_stage)]
 
     plt.figure(figsize=(50, 40))
-    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=250, font_size=12, edge_color="gray", alpha=1)
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=100, font_size=12, edge_color="gray", alpha=1)
     nx.draw_networkx_edge_labels(G=M, pos=pos, edge_labels=edge_labels)
     plt.title("Material Flow Graph")
     plt.savefig(os.path.join(save_path, f"material_flow_period_{t}.jpg"), format="jpg")
@@ -310,7 +310,7 @@ def no_backlog_env_proxy(state_dict: dict, stage_id: int, agent_id: int, demand:
     action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action
     # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
     if stage_id == 0:
-        stage_order_action = demand * sup_action
+        stage_order_action = ((demand * sup_action)/sum(sup_action)).astype(int)
     elif stage_id == num_stages - 1:
         avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage_id-1}" in x])
         stage_order_action = sup_action * avg_order.astype(int)
