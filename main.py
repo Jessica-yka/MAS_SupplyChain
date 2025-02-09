@@ -32,7 +32,7 @@ config_list = llm_config_list
 # ## Creating the Environment
 
 # %%req orders 
-env_config_name = "large_graph_normal_demand_test"
+env_config_name = "large_graph_test"
 # create the dir to store the results
 os.makedirs(f"results/{env_config_name}", exist_ok=True)
 clear_dir(f"results/{env_config_name}")

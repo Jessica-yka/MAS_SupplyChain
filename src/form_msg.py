@@ -1,4 +1,5 @@
-from utils import get_state_description, get_demand_description  
+from utils import get_state_description, get_demand_description
+from env import InventoryManagementEnv
 
 task1_msg = (
     "Task1: Do you want to remove anyone from your upstream supplier list?\n"
@@ -11,7 +12,7 @@ task2_msg = (
 )
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round? You can only place orders to your upstream suppliers\n"
-    "Please estimate the downstream demand in the future, and consider the lead time and order cost when making decision. State your reason in 1-2 sentences first "
+    "Please estimate the future downstream demand based on the recent sales, and consider the lead time and order cost when making decision. State your reason in 1-2 sentences first "
     "Please provide your action as a list following this format. E.g.,[(\"agent0\": 4), (\"agent1\": 2)].\n"
 )
 gold_rule_msg = (
@@ -41,37 +42,54 @@ expected_demand = (
     "Task: What is your estimated demand from downstream in the next round? Provide the answer in brackets (e.g., [10]). \n"
 )
     
-def generate_msg(im_env, enable_graph_change: bool, action_order_dict: dict, past_req_orders: list, stage_state: dict, period: int, stage: int, cur_agent_idx: int):
-
-    if stage != 0:
-        down_order = []
-        for down_agent_idx in range(im_env.num_agents_per_stage):
-            dr = action_order_dict[f'stage_{stage - 1}_agent_{down_agent_idx}'][cur_agent_idx]
-            if dr != 0:
-                down_order.append(f"from agent{down_agent_idx}: {dr}")
-        down_order = "; ".join(down_order)
-        downstream_order = f"Your downstream order from the agents at stage {stage-1} for this round is: {down_order}. "
-    else:
-        downstream_order = ""
-
-    demand_description = get_demand_description(im_env.demand_fn)
-    agent_name = f"stage_{stage}_agent_{cur_agent_idx}"
+def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_list: list, enable_graph_change: bool, action_order_dict: dict, past_req_orders: list, stage_state: dict, period: int, stage_id: int, cur_agent_id: int):
+    
+    agent_name = f"stage_{stage_id}_agent_{cur_agent_id}"
     message = (
         f"Now this is the round {period + 1}, "
-        f"and you are stage_{stage}_agent_{cur_agent_idx} at the stage {stage}: {im_env.stage_names[stage]} in the supply chain. "
-        f"Given your current state:\n{get_state_description(state=stage_state, past_req_orders=past_req_orders, G=im_env.sc_graph.G, agent_name=agent_name, state_format=im_env.state_format, enable_graph_change=enable_graph_change)}\n\n"
+        f"and you are {agent_name} at the stage {stage_id}: {im_env.stage_names[stage_id]} in the supply chain. "
         )
-
-    if stage == 0:
-        message += f"{demand_description}\n"
-    else:
+    
+    for event in im_env.emergent_events[im_env.period]:
+        if event == "sudden_shutdown":
+            shutdown_agents = []
+            for (stage_id, agent_id) in shutdown_list:
+                shutdown_agents.append(f"stage_{stage_id}_agent_{agent_id}")
+            shutdown_agents = " ".join(shutdown_agents)
+            shutdown_message = (
+                f"There is a sudden shutdown event. "
+                f"Those agent(s) are closed since now: {shutdown_agents}"
+            )
+            message += shutdown_message
+        if event == "recovery":
+            recovered_agents = []
+            for (stage_id, agent_id) in recovery_list:
+                recovered_agents.append(f"stage_{stage_id}_agent_{agent_id}")
+            recovered_agents = " ".join(recovered_agents)
+            recover_message = (
+                f"There is a recovery event. "
+                f"Those agent(s) are re-open since now: {recovered_agents}"
+            )
+            message += recover_message
+    message += f"Given your current state:\n{get_state_description(state=stage_state, past_req_orders=past_req_orders, G=im_env.sc_graph.G, agent_name=agent_name, state_format=im_env.state_format, enable_graph_change=enable_graph_change)}\n\n"
+    if stage_id != 0:
+        down_order = []
+        for down_agent_id in range(im_env.num_agents_per_stage):
+            dr = action_order_dict[f'stage_{stage_id - 1}_agent_{down_agent_id}'][cur_agent_id]
+            if dr != 0:
+                down_order.append(f"from agent{down_agent_id}: {dr}")
+        down_order = "; ".join(down_order)
+        downstream_order = f"Your downstream order from the agents at stage {stage_id-1} for this round is: {down_order}. "
         message += f"{downstream_order}\n"
+    else: # retailer stage
+        demand_description = get_demand_description(im_env.demand_fn)
+        message += f"{demand_description}\n"
 
     state_info = message
 
     # message += get_lead_time_task()
     # message += get_order_cost_task()
-    message += get_decision_task(stage=stage, im_env=im_env, enable_graph_change=enable_graph_change)
+    message += get_decision_task(stage=stage_id, im_env=im_env, enable_graph_change=enable_graph_change)
     # message += get_expected_demand_task()
 
     return message, state_info

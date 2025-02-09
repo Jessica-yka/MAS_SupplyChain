@@ -92,8 +92,13 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
 
     # Draw the multipartite graph
     # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
-    stage_colors = ["gold", "violet", "limegreen", "darkorange",]
+    stage_colors = ["gold", "violet", "limegreen", "darkorange", "black"]
     colors = [stage_colors[m] for m in range(num_stages) for x in range(num_agents_per_stage)]
+    # mask closed agents
+    for m in range(num_stages):
+        for x in range(num_agents_per_stage):
+            if env.running_agents[m][x] == 0:
+                colors[m*num_stages+x] = "black"
 
     plt.figure(figsize=(10, 8))
     nx.draw(M, pos, with_labels=True, node_color=colors, node_size=2500, font_size=12, edge_color="gray", alpha=1)
@@ -222,7 +227,6 @@ def get_GraphML_description(agent_name: str, G: nx.DiGraph, enable_graph_change:
     if enable_graph_change:
         upstream_nodes = [up for up in G.successors(agent_name) if G.nodes[up].get("stage")==G.nodes[agent_name].get("stage")+1]
         customer_nodes = [customer for node, customer in G.edges(agent_name) if G.edges[node, customer].get("supplier")]
-
         connected_nodes = upstream_nodes + customer_nodes + [agent_name]
         sub_graph = G.subgraph(connected_nodes)
     else:
@@ -241,12 +245,16 @@ def get_base_description(state, past_req_orders):
     suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==1])
     non_suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
     lead_times = " round(s); ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
+    order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
+    
+    # get the arriving deliveries from the upstream in this round
     arriving_delieveries = []
     for i, _ in enumerate(state['suppliers']):
         if state['suppliers'][i] == 1:
             arriving_delieveries.append(f"from agent{i}: {state['deliveries'][i][-state['lead_times'][i]:]}")
     arriving_delieveries = "; ".join(arriving_delieveries)
-    order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
+
+    # get the requested orders from downstreams in this round
     req_orders = []
     if len(past_req_orders) == 0:
         req_orders = "None"
@@ -289,24 +297,27 @@ def get_demand_description(demand_fn: Callable) -> str:
         std = demand_fn.std
         return f"The expected demand at the retailer (stage 0) is a normal distribution N({mu}, {std}), " \
             "truncated at 0, for all 12 rounds."
+    elif demand_fn.dist == "dyn_poisson_demand":
+        mean = demand_fn.mean
+        return f"The expected demand at the retailer (stage 0) is a poisson distribution P(lambda={mean}), and the lambda is increasingly bigger."
     else:
         raise KeyError(f"Error: {demand_fn} not implemented.")
   
 
-def no_backlog_env_proxy(state_dict: dict, stage: int, agent: int, num_stages: int, num_agents_per_stage: int, action_order_dict: dict, action_sup_dict: dict):
+def no_backlog_env_proxy(state_dict: dict, stage_id: int, agent_id: int, demand: int, num_stages: int, num_agents_per_stage: int, action_order_dict: dict, action_sup_dict: dict):
 
-    sup_action = state_dict[f'stage_{stage}_agent_{agent}']['suppliers']
-    action_sup_dict[f'stage_{stage}_agent_{agent}'] = sup_action
+    sup_action = state_dict[f'stage_{stage_id}_agent_{agent_id}']['suppliers']
+    action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action
     # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
-    if stage == 0:
-        stage_order_action = np.random.uniform(2, 4, num_agents_per_stage).astype(int) * sup_action
-    elif stage == num_stages - 1:
-        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
-        stage_order_action = sup_action * avg_order.astype(int) * 3
-    else:
-        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage-1}" in x])/sum(sup_action)
+    if stage_id == 0:
+        stage_order_action = demand * sup_action
+    elif stage_id == num_stages - 1:
+        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage_id-1}" in x])
         stage_order_action = sup_action * avg_order.astype(int)
-    action_order_dict[f'stage_{stage}_agent_{agent}'] = stage_order_action
+    else:
+        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage_id-1}" in x])/sum(sup_action)
+        stage_order_action = sup_action * avg_order.astype(int)
+    action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action
 
     return action_sup_dict, action_order_dict
 

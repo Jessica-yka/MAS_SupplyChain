@@ -196,25 +196,27 @@ def generate_init_inventories(dist: tuple, num_data: int, config_name: str="test
 class Demand_fn:
 
     def __init__(self, dist: tuple):
+        assert len(dist) == 3 if dist[0] == 'normal_demand' else 1, "Please provide the mean and std for the normal distribution."
         assert len(dist) == 3 if dist[0] == 'uniform_demand' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
         assert len(dist) == 2 if dist[0] == 'constant_demand' else 1, "Please provide the mean value for the constant distribution."
+        assert len(dist) == 2 if "poisson_demand" in dist[0] else 1, "Please provide the mean value for the poisson distribution."
         
         self.lb = None
         self.ub = None
         self.mean = None
         self.std = None
         self.dist = dist[0]
-        
+
         if self.dist == 'uniform_demand':
             self.lb = dist[1]
             self.ub = dist[2]
-        if self.dist == "normal_demand":
+        elif self.dist == "normal_demand":
             self.mean = dist[1]
             self.std = dist[2]
         elif self.dist == 'constant_demand':
             self.mean = dist[1]
-
-
+        elif "poisson_demand" in self.dist:
+            self.mean = dist[1]
 
         self.period = -1
 
@@ -226,6 +228,12 @@ class Demand_fn:
     
     def normal_demand(self):
         return np.random.normal(self.mean, self.std)
+    
+    def poisson_demand(self):
+        return np.random.poisson(self.mean)
+    
+    def dyn_poisson_demand(self):
+        return np.random.poisson(self.mean + 2*self.period)
         
     def __call__(self, t):
         self.period = t
@@ -235,6 +243,10 @@ class Demand_fn:
             return self.uniform_demand()
         elif self.dist == "normal_demand":
             return self.normal_demand()
+        elif self.dist == "poisson_demand":
+            return self.poisson_demand()
+        elif self.dist == "dyn_poisson_demand":
+            return self.dyn_poisson_demand()
         else:
             raise AssertionError("Demand function is not implemented.")
         

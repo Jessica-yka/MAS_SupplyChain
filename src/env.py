@@ -51,7 +51,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
         prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list, state_format: str,
         supply_relations: dict, demand_relations: dict, stage_names: list, sc_graph: SupplyChain_Graph, agent_profiles: list, enable_graph_change: bool, 
-        llm_agents: list=None, init_seed: int = 0):
+        emergent_events: dict, shut_seq: dict, rec_seq: dict, llm_agents: list=None, init_seed: int = 0):
         """
         Initialize the inventory management environment
 
@@ -121,6 +121,9 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.agent_profiles = agent_profiles
         self.sc_graph = sc_graph
         self.enable_graph_change = enable_graph_change
+        self.emergent_events = emergent_events
+        self.shut_seq = shut_seq
+        self.rec_seq = rec_seq
 
         # Create all variables
         self.period = 0
@@ -132,7 +135,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demands = np.zeros(self.num_periods + 1, dtype=int)
         self.profits = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.total_profits = np.zeros(self.num_periods + 1, dtype=int)
-
+        self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage))
+        self.shutdown_agents_set = set()
 
         # Compute the upper bounds for state variables
         max_production = self.max_production
@@ -200,7 +204,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demands.fill(0)
         self.profits.fill(0)
         self.total_profits.fill(0)
-
+        self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage))
+        self.shutdown_agents_set = set()
 
         # Set the initial condition and state
         self.inventories[:, :, 0] = self.init_inventories # (stage, agent, period)
@@ -298,7 +303,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
         self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
-        
+        print(self.demand_fn(t))
         self.demands[t] = int(self.demand_fn(t))
         # Add the delivered orders
         # I_{m,t} <- I_{m,t-1} + R_{m,t-L_m} (after delivery)
@@ -408,6 +413,41 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         return parsed_state
 
+    def get_all_shutdown_agents(self):
+        print("The closed agents are", ", ".join(self.shutdown_agents_set))
+
+    def create_shutdown_event(self, stage_id: int, agent_id: int, state_dict: dict):
+        print(f"Shutdown stage_{stage_id}_agent_{agent_id}. ")
+        self.running_agents[stage_id][agent_id] = 0
+        # remove shutdown agents from the suppliers of each downstream agents
+        if stage_id != 0: # has downstream customer
+            for agent_id in range(self.num_agents_per_stage):
+                state_dict[f"stage_{stage_id-1}_agent_{agent_id}"]["suppliers"][agent_id] = 0
+        # store newly shutdown agents in the list
+        self.shutdown_agents_set.add(f"stage_{stage_id}_agent_{agent_id}")
+        # clear the inventory pf shutdown agents
+        self.inventories[stage_id, agent_id, self.period] = 0
+
+        return state_dict
+
+    def create_recovery_event(self, stage_id: int, agent_id: int):
+        print(f"Re-open stage_{stage_id}_agent_{agent_id}.")
+        self.running_agents[stage_id][agent_id] = 1
+        # Remove the recovered agents from the shutdown list
+        self.shutdown_agents_set.discard(f"stage_{stage_id}_agent_{agent_id}")
+
+    def create_demand_surge(self):
+        # double the expectation of demand distribution
+        if self.demand_fn.dist == "constant_demand":
+            self.demand_fn.mean *= 2
+        elif self.demand_fn.dist == "uniform_demand":
+            self.demand_fn.lb *= 2
+            self.demand_fn.ub *= 2
+        elif self.demand_fn.dist == "normal_demand":
+            self.demand_fn.mean *= 2
+        elif "poisson" in self.demand_fn.dist:
+            self.demand_fn.mean *= 2
+
 
 def env_creator(env_config):
     """
@@ -435,6 +475,9 @@ def env_creator(env_config):
         llm_agents=env_config['llm_agents'],
         state_format=env_config['state_format'],
         enable_graph_change=env_config["enable_graph_change"], 
+        emergent_events=env_config["emergent_events"], 
+        shut_seq=env_config["shut_seq"],
+        rec_seq=env_config["rec_seq"],  
         agent_profiles=agent_profiles,
         sc_graph = sc_graph,
     )
@@ -490,8 +533,7 @@ if __name__ == '__main__':
             sup_dict=sup_dict,
             dem_dict=dem_dict
         )
-        
-        
+               
         # print(f"next_state_dict = {next_state_dict}")
         # print(f"next_state_dict = {im_env.parse_state(next_state_dict)}")
         # print(f"rewards = {rewards}")
