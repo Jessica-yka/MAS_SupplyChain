@@ -59,6 +59,31 @@ env_configs = {
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 2,
         "num_init_customers": 2,
+        "num_agents_per_stage": 50, # >= 2
+        "num_periods": 10,
+        "num_stages": 4,
+        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
+        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
+        "price_cost_dist": "uniform", # constant/uniform/normal/etc
+        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
+        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
+        "demand_fn": ("constant_demand", 10), # constant/functional
+        "holding_costs_dist": "constant", 
+        "backlog_costs_dist": "constant", 
+        "profit_rate_dist": ("uniform", 0, 1), 
+        "llm_agents": [(1, 1)],
+        "enable_graph_change": True, 
+        "enable_price_change": False, 
+        "state_format": "base", 
+        "emergent_events": [], 
+        "shut_seq": {},
+        "rec_seq": {},
+    },
+    "large_graph_test_ee": {
+        "config_name": "large_graph_test",
+        "sup_dem_relation_type": "random", # random/fixed
+        "num_init_suppliers": 2,
+        "num_init_customers": 2,
         "num_agents_per_stage": 20, # >= 2
         "num_periods": 10,
         "num_stages": 4,
@@ -73,6 +98,7 @@ env_configs = {
         "profit_rate_dist": ("uniform", 0, 1), 
         "llm_agents": [(1, 1)],
         "enable_graph_change": True, 
+        "enable_price_change": False, 
         "state_format": "base", 
         "emergent_events": [(5, "sudden_shutdown"), (7, "recovery")], 
         "shut_seq": {5: [(2, 2), (2, 10), (2, 13)]},
@@ -118,6 +144,7 @@ env_configs = {
         "profit_rate_dist": ("uniform", 0, 1), 
         "llm_agents": [(1, 1)],
         "enable_graph_change": True, 
+        "enable_price_change": False, 
         "state_format": "base", 
         "emergent_events": [(5, "demand_surge"), (6, "sudden_shutdown"), (7, "recovery")], 
         "shut_seq": {6:[(0, 3), (2, 5)]},
@@ -156,6 +183,7 @@ def get_env_configs(env_configs: dict):
     llm_agents = env_configs["llm_agents"]
     state_format = env_configs["state_format"]
     enable_graph_change = env_configs["enable_graph_change"]
+    enable_price_change = env_configs["enable_price_change"]
     emergent_events = defaultdict(list)
     for (t, ee) in env_configs["emergent_events"]:
         emergent_events[t].append(ee)
@@ -181,6 +209,7 @@ def get_env_configs(env_configs: dict):
         "llm_agents": llm_agents,
         "state_format": state_format, 
         "enable_graph_change": enable_graph_change,
+        "enable_price_change": enable_price_change, 
         "emergent_events": emergent_events,
         "shut_seq": shut_seq,
         "rec_seq": rec_seq,  

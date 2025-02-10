@@ -304,23 +304,6 @@ def get_demand_description(demand_fn: Callable) -> str:
         raise KeyError(f"Error: {demand_fn} not implemented.")
   
 
-def no_backlog_env_proxy(state_dict: dict, stage_id: int, agent_id: int, demand: int, num_stages: int, num_agents_per_stage: int, action_order_dict: dict, action_sup_dict: dict):
-
-    sup_action = state_dict[f'stage_{stage_id}_agent_{agent_id}']['suppliers']
-    action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action
-    # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
-    if stage_id == 0:
-        stage_order_action = ((demand * sup_action)/sum(sup_action)).astype(int)
-    elif stage_id == num_stages - 1:
-        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage_id-1}" in x])
-        stage_order_action = sup_action * avg_order.astype(int)
-    else:
-        avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage_id-1}" in x])/sum(sup_action)
-        stage_order_action = sup_action * avg_order.astype(int)
-    action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action
-
-    return action_sup_dict, action_order_dict
-
 
 def update_sup_action(sup_action: list, rm_match: str, add_match: str):
     

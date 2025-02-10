@@ -13,8 +13,13 @@ task2_msg = (
 # Please estimate the future downstream demand based on the recent sales, and consider the lead time and order cost when making decision. 
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round? You can only place orders to your upstream suppliers\n"
-    "State your reason in 1-2 sentences first "
-    "Please provide your action as a list following this format. E.g.,[(\"agent0\": 4), (\"agent1\": 2)].\n"
+    "Please state your reason in 1-2 sentences first "
+    "and then provide your action as a list following this format. E.g.,[(\"agent0\": 4), (\"agent1\": 2)].\n"
+)
+task4_msg = (
+    "Task4: What is the price you would like to set for the products?"
+    "Please state your reason in 1-2 sentences first "
+    "and then provide your action as a list following this format (e.g., [8])"
 )
 gold_rule_msg = (
     "\n\n"
@@ -26,6 +31,7 @@ gold_rule_msg = (
     "Please consider the lead time and place your order in advance. "
     "Please consider the lead time and order costs when selecting your suppliers. "
     "Please consider the recent sales when deciding the order quantity. "
+    "Please consider the order cost and the pricing of competitors when setting price. "
     "Remember that your upstream has its own lead time, so do not wait until your inventory runs out. "
     "Also, avoid ordering too many units at once. "
     "Try to spread your orders over multiple rounds to prevent the bullwhip effect. "
@@ -43,7 +49,8 @@ expected_demand = (
     "Task: What is your estimated demand from downstream in the next round? Provide the answer in brackets (e.g., [10]). \n"
 )
     
-def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_list: list, enable_graph_change: bool, action_order_dict: dict, past_req_orders: list, stage_state: dict, period: int, stage_id: int, cur_agent_id: int):
+def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_list: list, enable_graph_change: bool, enable_price_change: bool, action_order_dict: dict, 
+                 past_req_orders: list, stage_state: dict, period: int, stage_id: int, cur_agent_id: int):
     
     agent_name = f"stage_{stage_id}_agent_{cur_agent_id}"
     message = (
@@ -90,7 +97,7 @@ def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_l
 
     # message += get_lead_time_task()
     # message += get_order_cost_task()
-    message += get_decision_task(stage=stage_id, im_env=im_env, enable_graph_change=enable_graph_change)
+    message += get_decision_task(stage=stage_id, im_env=im_env, enable_graph_change=enable_graph_change, enable_price_change=enable_price_change)
     # message += get_expected_demand_task()
 
     return message, state_info
@@ -118,21 +125,27 @@ def get_expected_demand_task():
     return task_msg
 
 
-def get_decision_task(stage: int, im_env, enable_graph_change: bool):
+def get_decision_task(stage: int, im_env, enable_graph_change: bool, enable_price_change: bool):
 
     task_msg = ""
-    if stage == im_env.num_stages - 1 or not enable_graph_change: # do not ask for upstream orders for the manufacturer
-        num_tasks = 1
-        task_msg += f"There are {num_tasks} tasks for you to make decision\n\n"
-        task_msg += f"{task3_msg}\n"
-    else:
-        num_tasks = 3
-        task_msg += f"There are {num_tasks} tasks for you to make decision\n\n"
+    num_tasks = 0        
+
+    if stage < im_env.num_stages - 1 and enable_graph_change: # Ask for supplier updates if it is allowed or it is not a manufacturer
         task_msg += f"{task1_msg}\n"
         task_msg += f"{task2_msg}\n"
-        # task_msg += f"{expected_demand}\n"
-        task_msg += f"{task3_msg}\n"
-        
+        num_tasks += 2
+
+    # Ask for order quantity
+    # task_msg += f"{expected_demand}\n"
+    task_msg += f"{task3_msg}\n"
+    num_tasks += 1
+
+    # Ask for price decision
+    if enable_price_change:
+        task_msg += f"{task4_msg}\n"
+        num_tasks += 1
+
+    task_msg = f"There are {num_tasks} tasks for you to make decision\n\n" + task_msg
 
     task_msg += f"{gold_rule_msg}\n"
 

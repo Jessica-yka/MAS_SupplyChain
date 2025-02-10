@@ -10,7 +10,7 @@ from llm_config import llm_config_list
 from utils import extract_pairs
 from form_msg import generate_msg
 from utils import visualize_state, save_string_to_file
-from utils import no_backlog_env_proxy, update_sup_action
+from utils import update_sup_action
 
 np.random.seed(0)
 
@@ -39,6 +39,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
     
     all_state_dicts = {}
     all_action_order_dicts = {}
+    all_action_price_dicts = {}
     all_action_sup_dicts = {}
     all_action_dem_dicts = {}
     all_reward_dicts = {}
@@ -52,6 +53,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
     num_agents_per_stage = im_env.num_agents_per_stage
     llm_agent_set = im_env.llm_agent_set
     enable_graph_change = im_env.enable_graph_change
+    enable_price_change = im_env.enable_price_change
     visualize_state(env=im_env, rewards={}, t=-1, save_prefix=config_name)
     
     for period in range(im_env.num_periods):
@@ -66,6 +68,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
 
         all_state_dicts[period] = state_dict
         action_order_dict = {}
+        action_price_dict = {}
         action_sup_dict = {}
         action_dem_dict = {}
         total_chat_summary = ""
@@ -114,12 +117,12 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                 if im_env.running_agents[stage_id][agent_id] == 0:
                     action_sup_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(num_agents_per_stage, dtype=int)
                     action_order_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(num_agents_per_stage, dtype=int)  
-                
+                    action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = 0
                 elif (stage_id, agent_id) in llm_agent_set: # just to have only a few agents in the environment to be controlled by LLM
                     stage_state = state_dict[f'stage_{stage_id}_agent_{agent_id}']
                     pr_orders = past_req_orders.get(f'stage_{stage_id}_agent_{agent_id}', [])
                     message, state_info = generate_msg(shutdown_list=shutdown_list, recovery_list=recovery_list, enable_graph_change=enable_graph_change, stage_id=stage_id, \
-                                                       cur_agent_id=agent_id, stage_state=stage_state, im_env=im_env, 
+                                                       cur_agent_id=agent_id, stage_state=stage_state, im_env=im_env, enable_price_change=enable_price_change, 
                                                        action_order_dict=action_order_dict, past_req_orders=pr_orders, period=period)
                     chat_result = user_proxy.initiate_chat(
                         stage_agents[stage_id*num_agents_per_stage+agent_id],
@@ -170,18 +173,20 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                         print("stage_order_action", stage_order_action)
                         if sum(stage_order_action)==0:
                             raise AssertionError("order action not recorded")
+                    if enable_price_change:
+                        action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = match[-1]
                 else:
-                    action_sup_dict, action_order_dict = no_backlog_env_proxy(state_dict=state_dict, stage_id=stage_id, agent_id=agent_id, num_stages=num_stages, 
-                                                                              num_agents_per_stage=num_agents_per_stage, action_order_dict=action_order_dict, 
-                                                                              action_sup_dict=action_sup_dict, demand=im_env.demand_fn(period))
+                    action_sup_dict, action_order_dict, action_price_dict = im_env.no_backlog_env_proxy(stage_id=stage_id, agent_id=agent_id, action_order_dict=action_order_dict, 
+                                                                                                        action_sup_dict=action_sup_dict, action_price_dict=action_price_dict)
                     
         
-        next_states, rewards, terminations, truncations, infos = im_env.step(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict)
+        next_states, rewards, terminations, truncations, infos = im_env.step(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict, price_dict=action_price_dict)
         next_state_dict = im_env.parse_state(next_states)
         all_state_dicts[period + 1] = next_state_dict
         all_action_order_dicts[period + 1] = action_order_dict
         all_action_sup_dicts[period + 1] = action_sup_dict
         all_action_dem_dicts[period + 1] = action_dem_dict
+        all_action_price_dicts[period + 1] = action_price_dict
         all_reward_dicts[period + 1] = rewards
         # episode_reward += sum(rewards.values())
         for (stage_id, agent_id) in im_env.llm_agent_set:
