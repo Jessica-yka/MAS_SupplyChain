@@ -49,7 +49,7 @@ class InventoryManagementEnv(MultiAgentEnv):
 
     def __init__(
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
-        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list, state_format: str,
+        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list, state_format: str, 
         supply_relations: dict, demand_relations: dict, stage_names: list, sc_graph: SupplyChain_Graph, agent_profiles: list, enable_graph_change: bool, 
         enable_price_change: bool, emergent_events: dict, shut_seq: dict, rec_seq: dict, llm_agents: list=None, init_seed: int = 0):
         """

@@ -59,7 +59,7 @@ env_configs = {
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 2,
         "num_init_customers": 2,
-        "num_agents_per_stage": 50, # >= 2
+        "num_agents_per_stage": 20, # >= 2
         "num_periods": 10,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
@@ -75,6 +75,7 @@ env_configs = {
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
+        "env_no_backlog": True, 
         "emergent_events": [], 
         "shut_seq": {},
         "rec_seq": {},
@@ -182,6 +183,12 @@ def get_env_configs(env_configs: dict):
     stage_names = env_configs["stage_names"]
     llm_agents = env_configs["llm_agents"]
     state_format = env_configs["state_format"]
+    env_no_backlog = env_configs["env_no_backlog"]
+    if env_no_backlog:
+        for m in range(num_stages):
+            for x in range(num_agents_per_stage):
+                if not ((m, x) in llm_agents):
+                    init_inventories[m*num_agents_per_stage+x] = int(1e5)
     enable_graph_change = env_configs["enable_graph_change"]
     enable_price_change = env_configs["enable_price_change"]
     emergent_events = defaultdict(list)
@@ -208,6 +215,7 @@ def get_env_configs(env_configs: dict):
         'stage_names': stage_names,
         "llm_agents": llm_agents,
         "state_format": state_format, 
+        "env_no_backlog": env_no_backlog, 
         "enable_graph_change": enable_graph_change,
         "enable_price_change": enable_price_change, 
         "emergent_events": emergent_events,
