@@ -61,6 +61,7 @@ def generate_prod_cost(dist: str, num_data: int, lb=5, ub=15, config_name: str="
         data = np.array([mean for _ in range(num_data)])
     else:
         raise AssertionError("Prod cost function is not implemented.")
+    data = data.astype(int)
     save_array(data, f"env/{config_name}/prod_cost.npy")
     return data
 
@@ -90,8 +91,8 @@ def generate_cost_price(prod_cost_dist: str, profit_rate_dist: tuple, num_stages
     all_sale_prices = np.array(all_sale_prices).astype(int)
     all_order_costs = np.array(all_order_costs).astype(int)
     save_array(all_sale_prices, f"env/{config_name}/sale_prices.npy")
-    save_array(all_order_costs, f"env/{config_name}/total_costs.npy")
-    return all_order_costs, all_sale_prices
+    save_array(all_order_costs, f"env/{config_name}/order_costs.npy")
+    return all_order_costs, all_sale_prices, all_prod_costs
 
 
 def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage: int, \

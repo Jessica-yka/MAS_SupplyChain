@@ -49,7 +49,7 @@ class InventoryManagementEnv(MultiAgentEnv):
 
     def __init__(
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
-        prod_capacities: list, sale_prices: list, order_costs: list, backlog_costs: list, holding_costs: list, state_format: str, 
+        prod_capacities: list, sale_prices: np.array, order_costs: np.array, prod_costs: np.array, backlog_costs: np.array, holding_costs: np.array, state_format: str, 
         supply_relations: dict, demand_relations: dict, stage_names: list, sc_graph: SupplyChain_Graph, agent_profiles: list, enable_graph_change: bool, 
         enable_price_change: bool, emergent_events: dict, shut_seq: dict, rec_seq: dict, llm_agents: list=None, init_seed: int = 0):
         """
@@ -112,6 +112,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.max_production = np.max(self.prod_capacities)
         self.init_sale_prices = np.array(sale_prices, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.order_costs = np.array(order_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
+        self.prod_costs = np.array(prod_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.backlog_costs = np.array(backlog_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.holding_costs = np.array(holding_costs, dtype=int).reshape(self.num_stages, self.num_agents_per_stage)
         self.init_supply_relations = supply_relations
@@ -233,6 +234,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         states["order_costs"] = self.order_costs
         states["backlog_costs"] = self.backlog_costs
         states["holding_costs"] = self.holding_costs
+        states["prod_costs"] = self.prod_costs
         states["lead_times"] = self.lead_times
         states["inventories"] = self.inventories[:, :, t]
         states["backlogs"] = self.backlogs[:, :, t]
@@ -259,7 +261,7 @@ class InventoryManagementEnv(MultiAgentEnv):
                         states["arriving_deliveries"][m, x, j, -lt:] = self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
                     elif t > 0:
                         states["arriving_deliveries"][m, x, j, -t:] = self.arriving_orders[m, x, j, 1:(t + 1)]
-
+        
         # self.state_dict = {f"stage_{m}_agent_{x}": states[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         self.state_dict = {}
         for m in range(self.num_stages):
@@ -278,6 +280,7 @@ class InventoryManagementEnv(MultiAgentEnv):
                 agent_state.append(states["customers"][m][x])
                 agent_state.append(states["recent_sales"][m][x])
                 agent_state.append(states["arriving_deliveries"][m][x])
+                agent_state.append(states["prod_costs"][m][x])
 
                 self.state_dict[f"stage_{m}_agent_{x}"] = agent_state
 
@@ -332,9 +335,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         fulfilled_rates = (fulfilled_orders+1e-10) / (cum_req_orders+1e-10)
         fulfilled_rates = np.repeat(fulfilled_rates[:, np.newaxis, :], self.num_agents_per_stage, axis=1)
         self.arriving_orders[:, :, :, t] = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
-        base_orders = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
-        remainder = self.orders[:, :, :, t] * fulfilled_rates - base_orders
-        remainder = np.sum(remainder, axis=1)
 
         # Compute the sales
         cum_fulfilled_orders = np.sum(self.arriving_orders, axis=1) # M * N * T -> the total orders fulfilled by stage m + 1 at time t
@@ -403,6 +403,7 @@ class InventoryManagementEnv(MultiAgentEnv):
             "customers": state[10], 
             'sales': state[11].tolist(),
             'deliveries': state[12].tolist(),
+            'prod_cost': state[13], 
         }
 
     def parse_state(self, state_dict: dict = None) -> dict:
@@ -425,7 +426,9 @@ class InventoryManagementEnv(MultiAgentEnv):
     def no_backlog_env_proxy(self, stage_id: int, agent_id: int,
                          action_order_dict: dict, action_sup_dict: dict, action_price_dict: dict):
         # Keep the supply relation at the initial stage
-        sup_action = self.init_supply_relations[stage_id][agent_id]
+        sup_action = self.supply_relations[stage_id][agent_id]
+        if sum(sup_action) == 0: # if it is just recovered
+            sup_action = self.init_supply_relations[stage_id][agent_id]
         action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action
         
         # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
@@ -454,11 +457,11 @@ class InventoryManagementEnv(MultiAgentEnv):
     def create_shutdown_event(self, stage_id: int, agent_id: int, state_dict: dict):
         print(f"Shutdown stage_{stage_id}_agent_{agent_id}. ")
         self.running_agents[stage_id][agent_id] = 0
-        # self.supply_relations[f"stage_{stage_id}_agent_{agent_id}"] = self.supply_relations[f"stage_{stage_id}_agent_{agent_id}"]
         # remove shutdown agents from the suppliers of each downstream agents
         if stage_id != 0: # has downstream customer
             for down_agent_id in range(self.num_agents_per_stage):
-                state_dict[f"stage_{stage_id-1}_agent_{down_agent_id}"]["suppliers"][agent_id] = 0
+                # state_dict[f"stage_{stage_id-1}_agent_{down_agent_id}"]["suppliers"][agent_id] = 0
+                self.supply_relations[stage_id-1][down_agent_id][agent_id] = 0
         # store newly shutdown agents in the list
         self.shutdown_agents_set.add(f"stage_{stage_id}_agent_{agent_id}")
         # clear the inventory of shutdown agents
@@ -503,6 +506,7 @@ def env_creator(env_config):
         prod_capacities=env_config['prod_capacities'],
         sale_prices=env_config['sale_prices'],
         order_costs=env_config['order_costs'],
+        prod_costs=env_config['prod_costs'], 
         backlog_costs=env_config['backlog_costs'],
         holding_costs=env_config['holding_costs'],
         supply_relations=env_config['supply_relations'],

@@ -100,7 +100,7 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
             if env.running_agents[m][x] == 0:
                 colors[m*num_agents_per_stage+x] = "black"
 
-    plt.figure(figsize=(50, 40))
+    plt.figure(figsize=(25, 20))
     nx.draw(M, pos, with_labels=True, node_color=colors, node_size=100, font_size=12, edge_color="gray", alpha=1)
     plt.title("Multipartite Graph")
     plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="jpg")
@@ -144,7 +144,7 @@ def draw_material_flow(env, t: int, save_prefix: str):
     stage_colors = ["gold", "violet", "limegreen", "darkorange",]
     colors = [stage_colors[m] for m in range(num_stages) for _ in range(num_agents_per_stage)]
 
-    plt.figure(figsize=(50, 40))
+    plt.figure(figsize=(25, 20))
     nx.draw(M, pos, with_labels=True, node_color=colors, node_size=100, font_size=12, edge_color="gray", alpha=1)
     nx.draw_networkx_edge_labels(G=M, pos=pos, edge_labels=edge_labels)
     plt.title("Material Flow Graph")
@@ -173,6 +173,7 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
         "suppliers": {},
         "customers": {},
         "order_cost": {},
+        "prod_cost": {},
         "recent_sales": {},
         "lead_time": {},
         "deliveries": {},
@@ -196,6 +197,7 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
                     "customers": [state_dict[f'stage_{stage}_agent_{agent}'][10]],
                     'recent_sales': [state_dict[f'stage_{stage}_agent_{agent}'][11]],
                     'deliveries': [state_dict[f'stage_{stage}_agent_{agent}'][12]],
+                    'prod_cost': [state_dict[f'stage_{stage}_agent_{agent}'][13]], 
                     'profits': [rewards.get(f'stage_{stage}_agent_{agent}', None)]
                     })], ignore_index=True)
     
@@ -246,7 +248,7 @@ def get_base_description(state, past_req_orders):
     non_suppliers = "; ".join([f"agent{i}" for i, _ in enumerate(state['suppliers']) if state['suppliers'][i]==0])
     lead_times = " round(s); ".join([f"from agent{i}: {state['lead_times'][i]}" for i, _ in enumerate(state['lead_times'])])
     order_costs = " unit(s); ".join([f"from agent{i}: {state['order_costs'][i]}" for i, _ in enumerate(state['order_costs'])])
-    
+    prod_cost = state["prod_cost"]
     # get the arriving deliveries from the upstream in this round
     arriving_delieveries = []
     for i, _ in enumerate(state['suppliers']):
@@ -268,6 +270,7 @@ def get_base_description(state, past_req_orders):
     return (
         f" - Lead Time: {lead_times} round(s)\n"
         f" - Order costs: {order_costs} unit(s)\n"
+        f" - Production costs: {prod_cost} unit(s)\n"
         f" - Inventory Level: {state['inventory']} unit(s)\n"
         f" - Production capacity: {state['prod_capacity']} unit(s)\n"
         f" - Current Backlog (you owing to the downstream): {state['backlog']} unit(s)\n"
