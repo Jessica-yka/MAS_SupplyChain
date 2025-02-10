@@ -145,7 +145,7 @@ def get_decision_task(stage: int, im_env, enable_graph_change: bool, enable_pric
         task_msg += f"{task4_msg}\n"
         num_tasks += 1
 
-    task_msg = f"There are {num_tasks} tasks for you to make decision\n\n" + task_msg
+    task_msg = f"There are {num_tasks} task(s) for you to make decision(s). \n\n" + task_msg
 
     task_msg += f"{gold_rule_msg}\n"
 

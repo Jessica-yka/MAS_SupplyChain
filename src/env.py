@@ -335,11 +335,6 @@ class InventoryManagementEnv(MultiAgentEnv):
         base_orders = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
         remainder = self.orders[:, :, :, t] * fulfilled_rates - base_orders
         remainder = np.sum(remainder, axis=1)
-        # print(remainder.shape)
-        # print(remainder[0, 1])
-        # print(self.arriving_orders[0, :, 1, t])
-        # exit()
-
 
         # Compute the sales
         cum_fulfilled_orders = np.sum(self.arriving_orders, axis=1) # M * N * T -> the total orders fulfilled by stage m + 1 at time t

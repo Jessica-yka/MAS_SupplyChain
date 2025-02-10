@@ -66,7 +66,7 @@ env_configs = {
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
         "lead_time_dist": ("uniform", 1, 10), # constant/uniform
-        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
+        "prod_capacity_dist": ("uniform", 50, 80), # constant/uniform
         "demand_fn": ("constant_demand", 10), # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 

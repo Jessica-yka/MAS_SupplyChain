@@ -189,8 +189,12 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         all_action_price_dicts[period + 1] = action_price_dict
         all_reward_dicts[period + 1] = rewards
         # episode_reward += sum(rewards.values())
+        llm_agent_rewards = {}
+        round_reward_sum = 0
         for (stage_id, agent_id) in im_env.llm_agent_set:
-            episode_reward += rewards[f'stage_{stage_id}_agent_{agent_id}']
+            llm_agent_rewards[f'stage_{stage_id}_agent_{agent_id}'] = rewards[f'stage_{stage_id}_agent_{agent_id}']
+            round_reward_sum += rewards[f'stage_{stage_id}_agent_{agent_id}']
+        episode_reward += round_reward_sum
         # print(
         #     f"period = {period}, action_order_dict = {action_order_dict}, rewards = {rewards}, episode_reward = {episode_reward}, " \
         #     f"api_cost = {api_cost}")
@@ -201,14 +205,18 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         #     f"action_order_dict = {action_order_dict},"
         # )
         print(
-            f"rewards = {rewards}"
+            f"llm_agent_rewards = {llm_agent_rewards}"
         )
         print(
-            f"episode_reward = {episode_reward}"
+            f"round_reward_sum = {round_reward_sum}"
         )
-        print(f"api_cost = {api_cost}")
-        print('=' * 80)
         visualize_state(env=im_env, rewards=rewards, t=period, save_prefix=config_name)
-        save_string_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=episode_reward)
+        save_string_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=round_reward_sum)
 
+    print(
+        f"episode_reward = {episode_reward}"
+    )
+    print(f"api_cost = {api_cost}")
+    print('=' * 80)
+        
     return episode_reward

@@ -11,7 +11,7 @@ from typing import Callable
 
 def save_string_to_file(data: str, save_path: str, t: int, round: int, reward: int):
     print("Saving data to: ", f"results/{save_path}/chat_summary_round{round}_period{t}_reward{reward}.txt")
-    with open(f"results/{save_path}/chat_summary_round{round}_period{t}.txt", 'w') as f:
+    with open(f"results/{save_path}/chat_summary_round{round}_period{t}_reward{reward}.txt", 'w') as f:
         f.write(data)
 
 def save_dict_to_json(data: dict, save_path: str):
