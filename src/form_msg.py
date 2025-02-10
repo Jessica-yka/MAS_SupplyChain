@@ -66,7 +66,7 @@ def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_l
             shutdown_agents = []
             for (st_stage_id, st_agent_id) in shutdown_list:
                 shutdown_agents.append(f"stage_{st_stage_id}_agent_{st_agent_id}")
-            shutdown_agents = " ".join(shutdown_agents)
+            shutdown_agents = ", ".join(shutdown_agents)
             shutdown_message = (
                 f"There is a sudden shutdown event. "
                 f"Those agent(s) are closed since now: {shutdown_agents}\n\n"
@@ -76,7 +76,7 @@ def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_l
             recovered_agents = []
             for (rec_stage_id, rec_agent_id) in recovery_list:
                 recovered_agents.append(f"stage_{rec_stage_id}_agent_{rec_agent_id}")
-            recovered_agents = " ".join(recovered_agents)
+            recovered_agents = ", ".join(recovered_agents)
             recover_message = (
                 f"There is a recovery event. "
                 f"Those agent(s) are re-open since now: {recovered_agents}\n\n"

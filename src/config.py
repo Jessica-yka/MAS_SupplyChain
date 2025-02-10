@@ -60,7 +60,7 @@ env_configs = {
         "num_init_suppliers": 2,
         "num_init_customers": 2,
         "num_agents_per_stage": 20, # >= 2
-        "num_periods": 5,
+        "num_periods": 10,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
@@ -76,9 +76,9 @@ env_configs = {
         "enable_price_change": False, 
         "state_format": "base", 
         "env_no_backlog": True, 
-        "emergent_events": [(2, "sudden_shutdown"), (3, "recovery")], 
-        "shut_seq": {2: [(3,3), (2,2)]},
-        "rec_seq": {3: [(2,2)]},
+        "emergent_events": [], 
+        "shut_seq": {},
+        "rec_seq": {},
     },
     "large_graph_test_ee": {
         "config_name": "large_graph_test",

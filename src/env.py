@@ -307,11 +307,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         if self.enable_graph_change:
             self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
         self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
-        # Update price if needed
-        if self.enable_price_change:
-            for m in range(self.num_stages):
-                for x in range(self.num_agents_per_stage):
-                    self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
+        
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         self.demands[t] = int(self.demand_fn(t))
         # Add the delivered orders
@@ -362,11 +358,16 @@ class InventoryManagementEnv(MultiAgentEnv):
         order_costs = order_costs * self.arriving_orders[:, :, :, t]
         order_costs = np.sum(order_costs, axis=2)
         self.profits[:, :, t] = self.sale_prices * self.sales[:, :, t] - order_costs \
-                             - self.backlog_costs * self.backlogs[:, :, t] - self.holding_costs * self.inventories[:, :, t] \
-        
-
+                             - self.backlog_costs * self.backlogs[:, :, t] - self.holding_costs * self.inventories[:, :, t]
         self.total_profits[t] = np.sum(self.profits[:, :, t])
 
+        # Update price if needed
+        if self.enable_price_change:
+            for m in range(self.num_stages):
+                for x in range(self.num_agents_per_stage):
+                    self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
+            self.order_costs[:M-1, :] = self.sale_prices[1:, :]
+            
         # Determine rewards and terminations
         rewards = {f"stage_{m}_agent_{x}": self.profits[m, x, t] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         all_termination = self.period >= self.num_periods
