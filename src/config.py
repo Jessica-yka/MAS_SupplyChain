@@ -13,47 +13,6 @@ from collections import defaultdict
 np.random.seed(0)
 
 env_configs = {
-    "test": {
-        "config_name": "test",
-        "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 1,
-        "num_init_customers": 1,
-        "num_agents_per_stage": 4, # >= 2
-        "num_periods": 16,
-        "num_stages": 4,
-        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": "constant", # constant/uniform/etc
-        "price_cost_dist": "constant", # constant/uniform/normal/etc
-        "lead_time_dist": "constant", # constant/uniform
-        "prod_capacity_dist": "constant", # constant/uniform
-        "demand_fn": "constant_demand", # constant/functional
-        "holding_costs_dist": "constant",
-        "backlog_costs_dist": "constant",
-        "profit_rate_dist": "constant",
-        "llm_agents": None,
-        "state_format": "base", 
-    },
-    "basic": {
-        "config_name": "basic",
-        "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 1,
-        "num_init_customers": 1, 
-        "num_stages": 4,
-        "num_agents_per_stage": 4, # >= 2
-        "num_periods": 8,
-        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
-        "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 1, 5), # constant/uniform
-        "prod_capacity_dist": ("uniform", 10, 20), # constant/uniform
-        "demand_fn": ("constant_demand", 5), # constant/functional
-        "holding_costs_dist": "constant", 
-        "backlog_costs_dist": "constant", 
-        "profit_rate_dist": ("uniform", 0, 1), 
-        "llm_agents": [(i, j) for i in range(4) for j in range(4)],
-        "state_format": "base", 
-        "enable_graph_change": True, 
-    }, 
     "large_graph_test": {
         "config_name": "large_graph_test",
         "sup_dem_relation_type": "random", # random/fixed
@@ -67,7 +26,7 @@ env_configs = {
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
         "lead_time_dist": ("uniform", 1, 10), # constant/uniform
         "prod_capacity_dist": ("uniform", 50, 80), # constant/uniform
-        "demand_fn": ("constant_demand", 10), # constant/functional
+        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": False}, # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
@@ -93,7 +52,7 @@ env_configs = {
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
         "lead_time_dist": ("uniform", 1, 10), # constant/uniform
         "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
-        "demand_fn": ("constant_demand", 10), # constant/functional
+        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": False}, # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
@@ -118,38 +77,13 @@ env_configs = {
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
         "lead_time_dist": ("uniform", 1, 10), # constant/uniform
         "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
-        "demand_fn": ("normal_demand", 10, 3), # constant/functional
+        "demand_fn": {"dist": "normal_demand", "mean": 10, "std": 3, "trend": False}, # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
         "llm_agents": [(0, 1)],
         "enable_graph_change": True, 
         "state_format": "base", 
-    },
-    "large_graph_DynPoisson_demand_test": {
-        "config_name": "large_graph_DynPoisson_demand_test",
-        "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 3,
-        "num_init_customers": 3,
-        "num_agents_per_stage": 100, # >= 2
-        "num_periods": 10,
-        "num_stages": 4,
-        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
-        "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
-        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
-        "demand_fn": ("normal_demand", 10, 3), # constant/functional
-        "holding_costs_dist": "constant", 
-        "backlog_costs_dist": "constant", 
-        "profit_rate_dist": ("uniform", 0, 1), 
-        "llm_agents": [(1, 1)],
-        "enable_graph_change": True, 
-        "enable_price_change": False, 
-        "state_format": "base", 
-        "emergent_events": [(5, "demand_surge"), (6, "sudden_shutdown"), (7, "recovery")], 
-        "shut_seq": {6:[(0, 3), (2, 5)]},
-        "rec_seq": {7:[(2, 5)]}, 
     },
 }
 
@@ -179,7 +113,9 @@ def get_env_configs(env_configs: dict):
         generate_init_inventories(dist=env_configs["init_inventory_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     # profit_rates = \
     #     generate_profit_rates(dist=env_configs["profit_rate_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
-    demand_fn = Demand_fn(dist=env_configs["demand_fn"])
+    
+    demand_fn = Demand_fn(dist=env_configs["demand_fn"]['dist'], mean=env_configs["demand_fn"].get("mean", 0), std=env_configs["demand_fn"].get("std", 0), 
+                          lb=env_configs["demand_fn"].get("lb", 0), ub=env_configs["demand_fn"].get("ub", 0), trend=env_configs["demand_fn"].get("trend", False))
     stage_names = env_configs["stage_names"]
     llm_agents = env_configs["llm_agents"]
     state_format = env_configs["state_format"]

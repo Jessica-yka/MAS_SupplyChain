@@ -176,45 +176,43 @@ def generate_init_inventories(dist: tuple, num_data: int, config_name: str="test
 
 class Demand_fn:
 
-    def __init__(self, dist: tuple):
-        assert len(dist) == 3 if dist[0] == 'normal_demand' else 1, "Please provide the mean and std for the normal distribution."
-        assert len(dist) == 3 if dist[0] == 'uniform_demand' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
-        assert len(dist) == 2 if dist[0] == 'constant_demand' else 1, "Please provide the mean value for the constant distribution."
-        assert len(dist) == 2 if "poisson_demand" in dist[0] else 1, "Please provide the mean value for the poisson distribution."
+    def __init__(self, dist: str, trend: str, epsilon: int=None, mean: int=None, lb: int=None, ub: int=None, std: int=None):
+        # assert len(dist) == 3 if dist[0] == 'normal_demand' else 1, "Please provide the mean and std for the normal distribution."
+        # assert len(dist) == 3 if dist[0] == 'uniform_demand' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
+        # assert len(dist) == 2 if dist[0] == 'constant_demand' else 1, "Please provide the mean value for the constant distribution."
+        # assert len(dist) == 2 if "poisson_demand" in dist[0] else 1, "Please provide the mean value for the poisson distribution."
         
-        self.lb = None
-        self.ub = None
-        self.mean = None
-        self.std = None
-        self.dist = dist[0]
-
-        if self.dist == 'uniform_demand':
-            self.lb = dist[1]
-            self.ub = dist[2]
-        elif self.dist == "normal_demand":
-            self.mean = dist[1]
-            self.std = dist[2]
-        elif self.dist == 'constant_demand':
-            self.mean = dist[1]
-        elif "poisson_demand" in self.dist:
-            self.mean = dist[1]
-
+        self.lb = lb
+        self.ub = ub
+        self.mean = mean
+        self.std = std
+        self.dist = dist
+        self.trend = lambda t: 0 
+        self.epsilon = epsilon
         self.period = -1
+
+        # There is a trend along time
+        if trend == "linear":
+            self.trend = lambda t: 2 * (t//2) 
+        else: # TO-DO: other forms of trend
+            raise ValueError("Trend function is not implemented")
+ 
 
     def constant_demand(self):
         return self.mean
 
     def uniform_demand(self):
-        return np.random.randint(low=self.lb, high=self.ub)
+        return np.random.randint(low=self.lb, high=self.ub) + self.trend(self.period)
     
     def normal_demand(self):
-        return np.random.normal(self.mean, self.std)
+        return np.random.normal(self.mean, self.std) + self.trend(self.period)
     
     def poisson_demand(self):
-        return np.random.poisson(self.mean)
+        return np.random.poisson(self.mean) + self.trend(self.period)
     
-    def dyn_poisson_demand(self):
-        return np.random.poisson(self.mean + 2*self.period)
+    def seasonal_demand(self):
+        return 3 * np.sin(2 * np.pi * 0.2 * self.period) + 5 + self.trend(self.period)
+    
         
     def __call__(self, t):
         self.period = t
@@ -226,8 +224,8 @@ class Demand_fn:
             return self.normal_demand()
         elif self.dist == "poisson_demand":
             return self.poisson_demand()
-        elif self.dist == "dyn_poisson_demand":
-            return self.dyn_poisson_demand()
+        elif self.dist == "seasonal_demand":
+            return self.seasonal_demand()
         else:
             raise AssertionError("Demand function is not implemented.")
         

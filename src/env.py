@@ -367,7 +367,7 @@ class InventoryManagementEnv(MultiAgentEnv):
                 for x in range(self.num_agents_per_stage):
                     self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
             self.order_costs[:M-1, :] = self.sale_prices[1:, :]
-            
+
         # Determine rewards and terminations
         rewards = {f"stage_{m}_agent_{x}": self.profits[m, x, t] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         all_termination = self.period >= self.num_periods
@@ -455,6 +455,7 @@ class InventoryManagementEnv(MultiAgentEnv):
     def get_all_shutdown_agents(self):
         print("The closed agents are", ", ".join(self.shutdown_agents_set))
 
+
     def create_shutdown_event(self, stage_id: int, agent_id: int, state_dict: dict):
         print(f"Shutdown stage_{stage_id}_agent_{agent_id}. ")
         self.running_agents[stage_id][agent_id] = 0
@@ -476,6 +477,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         # Remove the recovered agents from the shutdown list
         self.shutdown_agents_set.discard(f"stage_{stage_id}_agent_{agent_id}")
 
+
     def create_demand_surge(self):
         # double the expectation of demand distribution
         if self.demand_fn.dist == "constant_demand":
@@ -485,8 +487,22 @@ class InventoryManagementEnv(MultiAgentEnv):
             self.demand_fn.ub *= 2
         elif self.demand_fn.dist == "normal_demand":
             self.demand_fn.mean *= 2
-        elif "poisson" in self.demand_fn.dist:
+        elif self.demand_fn.dist == "poisson_demand":
             self.demand_fn.mean *= 2
+
+
+    def create_demand_drop(self):
+        # cut the expectation of demand distribution by half
+        if self.demand_fn.dist == "constant_demand":
+            self.demand_fn.mean //= 2
+        elif self.demand_fn.dist == "uniform_demand":
+            self.demand_fn.lb //= 2
+            self.demand_fn.ub //= 2
+        elif self.demand_fn.dist == "normal_demand":
+            self.demand_fn.mean //= 2
+        elif self.demand_fn.dist == "poisson_demand":
+            self.demand_fn.mean //= 2
+
 
 
 def env_creator(env_config):
