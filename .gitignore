@@ -162,6 +162,8 @@ results/
 runs/
 notebooks/draft.ipynb
 draft.ipynb
+src/KDD-Tutorial-2-Let-Your-Graph-Do-The-Talking.ipynb
+
 *.txt
 
 # api keys
@@ -171,5 +173,6 @@ src/llm_config.py
 
 # conda env
 uist2025/
+
 
 .gitignore
