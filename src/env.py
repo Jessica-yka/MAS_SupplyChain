@@ -16,7 +16,7 @@ from utils import visualize_state, parse_stage_agent_id, clear_dir
 from data_simulation import generate_sup_dem_relations
 import os
 import copy
-from sc_graph import create_agent_profiles, SupplyChain_Graph
+# from sc_graph import create_agent_profiles, SupplyChain_Graph
 
 np.random.seed(0)
 
@@ -50,8 +50,8 @@ class InventoryManagementEnv(MultiAgentEnv):
     def __init__(
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
         prod_capacities: list, sale_prices: np.array, order_costs: np.array, prod_costs: np.array, backlog_costs: np.array, holding_costs: np.array, state_format: str, 
-        supply_relations: dict, demand_relations: dict, stage_names: list, sc_graph: SupplyChain_Graph, agent_profiles: list, enable_graph_change: bool, 
-        enable_price_change: bool, emergent_events: dict, shut_seq: dict, rec_seq: dict, llm_agents: list=None, init_seed: int = 0):
+        supply_relations: dict, demand_relations: dict, stage_names: list, agent_profiles: list, enable_graph_change: bool, 
+        enable_price_change: bool, emergent_events: dict, shut_seq: dict, rec_seq: dict, sc_graph=None, llm_agents: list=None, init_seed: int = 0):
         """
         Initialize the inventory management environment
 
@@ -212,7 +212,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.supply_relations = copy.deepcopy(self.init_supply_relations)
         self.demand_relations = copy.deepcopy(self.init_demand_relations)
         self.sale_prices = copy.deepcopy(self.init_sale_prices)
-        self.sc_graph.reset_G()
+        # self.sc_graph.reset_G()
         self.update_state()
 
         return self.state_dict, {}
@@ -509,9 +509,11 @@ def env_creator(env_config):
     """
     Create the environment
     """
-    agent_profiles = create_agent_profiles(env_config=env_config)
-    sc_graph = SupplyChain_Graph(agent_profiles=agent_profiles, num_stages=env_config["num_stages"], num_agents_per_stage=env_config["num_agents_per_stage"])
-    
+    # agent_profiles = create_agent_profiles(env_config=env_config)
+    # sc_graph = SupplyChain_Graph(agent_profiles=agent_profiles, num_stages=env_config["num_stages"], num_agents_per_stage=env_config["num_agents_per_stage"])
+    agent_profiles = None
+    sc_graph = None
+
     return InventoryManagementEnv(
         num_stages=env_config['num_stages'],
         num_agents_per_stage=env_config['num_agents_per_stage'],

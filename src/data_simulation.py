@@ -187,19 +187,20 @@ class Demand_fn:
         self.mean = mean
         self.std = std
         self.dist = dist
-        self.trend = lambda t: 0 
         self.epsilon = epsilon
         self.period = -1
 
         # There is a trend along time
-        if trend == "linear":
+        if trend == "":
+            self.trend = lambda t: 0 
+        elif trend == "linear":
             self.trend = lambda t: 2 * (t//2) 
         else: # TO-DO: other forms of trend
             raise ValueError("Trend function is not implemented")
  
 
     def constant_demand(self):
-        return self.mean
+        return self.mean + self.trend(self.period)
 
     def uniform_demand(self):
         return np.random.randint(low=self.lb, high=self.ub) + self.trend(self.period)

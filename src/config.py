@@ -19,14 +19,14 @@ env_configs = {
         "num_init_suppliers": 2,
         "num_init_customers": 2,
         "num_agents_per_stage": 20, # >= 2
-        "num_periods": 10,
+        "num_periods": 20,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
+        "lead_time_dist": ("uniform", 3, 10), # constant/uniform
         "prod_capacity_dist": ("uniform", 50, 80), # constant/uniform
-        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": False}, # constant/functional
+        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": "linear"}, # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
@@ -52,7 +52,7 @@ env_configs = {
         "price_cost_dist": "uniform", # constant/uniform/normal/etc
         "lead_time_dist": ("uniform", 1, 10), # constant/uniform
         "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
-        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": False}, # constant/functional
+        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": ""}, # constant/functional
         "holding_costs_dist": "constant", 
         "backlog_costs_dist": "constant", 
         "profit_rate_dist": ("uniform", 0, 1), 
@@ -137,7 +137,7 @@ def get_env_configs(env_configs: dict):
         'num_stages': num_stages,
         'num_periods': num_periods,
         'num_agents_per_stage': num_agents_per_stage,
-        "demand_dist": env_configs["demand_fn"][0],
+        "demand_dist": env_configs["demand_fn"]["dist"],
         'init_inventories': init_inventories, # num_stages * num_agents_per_stage
         'lead_times': lead_times, # num_stages * num_agents_per_stage * num_agents_per_stage
         'demand_fn': demand_fn,

@@ -64,7 +64,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         else:
             past_req_orders = dict()
         # update the nx supply chain graph with the latest env
-        im_env.sc_graph.update_graph(state_dict=state_dict, past_req_orders=past_req_orders) 
+        # im_env.sc_graph.update_graph(state_dict=state_dict, past_req_orders=past_req_orders) 
 
         all_state_dicts[period] = state_dict
         action_order_dict = {}
@@ -152,7 +152,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                             supplier_order_dict = extract_pairs(match2)
                             try:
                                 for i in range(num_agents_per_stage):
-                                    stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0) + supplier_order_dict.get(f"stage_{stage_id+1}_agent_{i}", 0)
+                                    stage_order_action[i] = sup_action[i]*(supplier_order_dict.get(f"agent{i}", 0) + supplier_order_dict.get(f"stage_{stage_id+1}_agent_{i}", 0))
                             except:
                                 pass
                         action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action
@@ -166,13 +166,13 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                             supplier_order_dict = extract_pairs(match)
                             try: # if the string format is valid
                                 for i in range(num_agents_per_stage):
-                                    stage_order_action[i] = supplier_order_dict.get(f"agent{i}", 0) + supplier_order_dict.get(f"stage_{stage_id+1}_agent_{i}", 0)
+                                    stage_order_action[i] = sup_action[i]*(supplier_order_dict.get(f"agent{i}", 0) + supplier_order_dict.get(f"stage_{stage_id+1}_agent_{i}", 0))
                             except:
                                 pass
                         action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action
                         print("stage_order_action", stage_order_action)
-                        if sum(stage_order_action)==0:
-                            raise AssertionError("order action not recorded")
+                        # if sum(stage_order_action)==0:
+                        #     raise AssertionError("order action not recorded")
                     if enable_price_change:
                         action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = match[-1]
                 else:

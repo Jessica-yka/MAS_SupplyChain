@@ -279,7 +279,7 @@ def get_base_description(state, past_req_orders):
         f" - In the last round, you placed orders to upstream suppliers: {req_orders}\n"
         f" - Arriving Deliveries (in this and the next round(s), from near to far): {arriving_delieveries}\n"
         f" - Your upstream suppliers are: {suppliers}\n" 
-        f" - Other available upstream suppliers in the environment are: {non_suppliers}\n"
+        f" - Other available upstream agents in the environment are: {non_suppliers}\n"
     )
 
 

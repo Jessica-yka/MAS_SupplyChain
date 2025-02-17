@@ -50,64 +50,65 @@ class agent_profile():
     def get_edge_features(self):
         return self.lead_time # order cost?
     
-    def get_node_text_attributes(self):
+    # def get_node_text_attributes(self):
 
-        attributes = []
-        # prod capacity
-        attributes.append(f"Production capacity is {self.prod_capacity} units")
-        # Prod cost
-        attributes.append(f"Production cost is {self.prod_cost} units")
-        # Holding cost
-        attributes.append(f"Holding cost is {self.holding_cost} units")
-        # Backlog cost
-        attributes.append(f"Backlog cost is {self.backlog_cost} units")
-        # Backlog
-        attributes.append(f"Current backlog is {self.backlog} units")
-        # Inventory
-        attributes.append(f"The current inventory is {self.inventory} units")
-        # price
-        attributes.append(f"Price is {self.sale_price} units")
-        # Fulfilled_rate
-        attributes.append(f"The order fulfilled rate in the last round is {self.fulfilled_rate}")
+    #     attributes = []
+    #     # prod capacity
+    #     attributes.append(f"Production capacity is {self.prod_capacity} units")
+    #     # Prod cost
+    #     attributes.append(f"Production cost is {self.prod_cost} units")
+    #     # Holding cost
+    #     attributes.append(f"Holding cost is {self.holding_cost} units")
+    #     # Backlog cost
+    #     attributes.append(f"Backlog cost is {self.backlog_cost} units")
+    #     # Backlog
+    #     attributes.append(f"Current backlog is {self.backlog} units")
+    #     # Inventory
+    #     attributes.append(f"The current inventory is {self.inventory} units")
+    #     # price
+    #     attributes.append(f"Price is {self.sale_price} units")
+    #     # Fulfilled_rate
+    #     attributes.append(f"The order fulfilled rate in the last round is {self.fulfilled_rate}")
         
-        return attributes
+    #     return attributes
     
 
-    def get_edge_text_attributes(self, agent_profiles: dict):
+    # def get_edge_text_attributes(self, agent_profiles: dict):
 
-        attributes = defaultdict(list)
-        # supply_relations
-        for agent_name in self.suppliers: # TO-CHECK: the format of suppliers
-            attributes[(self.name, agent_profiles[agent_name])].append(f"supplier")
-        # demand_relations
-        for agent_name in self.customers:
-            attributes[(self.name, agent_profiles[agent_name])].append(f"customer")
-        # lead time
-        for agent_name in self.upstream_agents:
-            attributes[(self.name, agent_profiles[agent_name])].append(f"lead time is {self.lead_times[agent]} units")
-        # Order cost
-        for agent_name in self.upstream_agents:
-            attributes[(self.name, agent_profiles[agent_name])].append(f"order cost is {self.order_cost[agent]} units")
-        # delievery
-        for agent_name in self.delivery:
-            attributes[(self.name, agent_profiles[agent_name])].append(f"Has {self.delivery} units to be delivered in {} days")
+    #     attributes = defaultdict(list)
+    #     # supply_relations
+    #     for agent_name in self.suppliers: # TO-CHECK: the format of suppliers
+    #         attributes[(self.name, agent_profiles[agent_name])].append(f"supplier")
+    #     # demand_relations
+    #     for agent_name in self.customers:
+    #         attributes[(self.name, agent_profiles[agent_name])].append(f"customer")
+    #     # lead time
+    #     for agent_name in self.upstream_agents:
+    #         attributes[(self.name, agent_profiles[agent_name])].append(f"lead time is {self.lead_times[agent]} units")
+    #     # Order cost
+    #     for agent_name in self.upstream_agents:
+    #         attributes[(self.name, agent_profiles[agent_name])].append(f"order cost is {self.order_cost[agent]} units")
+    #     # delievery
+    #     for agent_name in self.delivery:
+    #         attributes[(self.name, agent_profiles[agent_name])].append(f"Has {self.delivery} units to be delivered in {} days")
         
 
 
-def create_agent_profiles(env_config: dict):
+# def create_agent_profiles(env_config: dict):
 
-    agent_profiles = []
-    num_stages = env_config['num_stages']
-    num_agents_per_stage = env_config['num_agents_per_stage']
-    for i in range(num_stages):
-        for j in range(num_agents_per_stage):
-            agent_profiles.append(agent_profile(stage_idx=i, agent_idx=j, role=env_config["stage_names"][i], prod_capacity=env_config['prod_capacities'][i*num_agents_per_stage+j],  
-                                                sale_price=env_config['sale_prices'][i*num_agents_per_stage+j], init_inventory=env_config['init_inventories'][i*num_agents_per_stage+j], 
-                                                backlog_cost=env_config['backlog_costs'][i*num_agents_per_stage+j], holding_cost=env_config['holding_costs'][i*num_agents_per_stage+j], 
-                                                order_cost=env_config['order_costs'][i*num_agents_per_stage:(i+1)*num_agents_per_stage], prod_cost=env_config['prod_costs'][i*num_agents_per_stage:(i+1)*num_agents_per_stage], 
-                                                lead_times=env_config['lead_times'][i][j], suppliers=env_config['supply_relations'][i][j], customers=env_config['demand_relations'][i][j]))
+#     agent_profiles = []
+#     num_stages = env_config['num_stages']
+#     num_agents_per_stage = env_config['num_agents_per_stage']
+#     for i in range(num_stages):
+#         for j in range(num_agents_per_stage):
+#             agent_profiles.append(agent_profile(stage_idx=i, agent_idx=j, role=env_config["stage_names"][i], prod_capacity=env_config['prod_capacities'][i*num_agents_per_stage+j],  
+#                                                 sale_price=env_config['sale_prices'][i*num_agents_per_stage+j], init_inventory=env_config['init_inventories'][i*num_agents_per_stage+j], 
+#                                                 backlog_cost=env_config['backlog_costs'][i*num_agents_per_stage+j], holding_cost=env_config['holding_costs'][i*num_agents_per_stage+j], 
+#                                                 order_cost=env_config['order_costs'][i*num_agents_per_stage:(i+1)*num_agents_per_stage], prod_cost=env_config['prod_costs'][i*num_agents_per_stage:(i+1)*num_agents_per_stage], 
+#                                                 lead_times=env_config['lead_times'][i][j], suppliers=env_config['supply_relations'][i][j], customers=env_config['demand_relations'][i][j]),
+#                                                 delievery=env_config[], downstream_agents=env_config[], upstream_agents=env_config[])
     
-    return agent_profiles
+#     return agent_profiles
 
 
 

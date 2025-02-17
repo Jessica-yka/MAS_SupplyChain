@@ -8,7 +8,7 @@ import sys
 import time
 import numpy as np
 from typing import List
-from tqdm.notebook import tqdm
+from tqdm import tqdm
 from autogen import ConversableAgent
 sys.path.append('src')
 from env import env_creator

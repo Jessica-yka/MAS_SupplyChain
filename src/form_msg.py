@@ -11,6 +11,7 @@ task2_msg = (
     "and then provide your action as a list following this format (e.g., [2, 3] for adding agent2 and agent3 as suppliers, [] for doing nothing)\n"
 )
 # Please estimate the future downstream demand based on the recent sales, and consider the lead time and order cost when making decision. 
+# "Please state your reason in 1-2 sentences first "
 task3_msg = (
     "Task3: What is the order quantity you would like to place with each supplier for this round? You can only place orders to your upstream suppliers\n"
     "Please state your reason in 1-2 sentences first "
@@ -82,7 +83,7 @@ def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_l
                 f"Those agent(s) are re-open since now: {recovered_agents}\n\n"
             )
             message += recover_message
-    message += f"Given your current state:\n{get_state_description(state=stage_state, past_req_orders=past_req_orders, G=im_env.sc_graph.G, agent_name=agent_name, state_format=im_env.state_format, enable_graph_change=enable_graph_change)}\n\n"
+    message += f"Given your current state:\n{get_state_description(state=stage_state, past_req_orders=past_req_orders, G=None, agent_name=agent_name, state_format=im_env.state_format, enable_graph_change=enable_graph_change)}\n\n"
     if stage_id != 0:
         down_order = []
         for down_agent_id in range(im_env.num_agents_per_stage):
