@@ -168,7 +168,7 @@ src/KDD-Tutorial-2-Let-Your-Graph-Do-The-Talking.ipynb
 
 # api keys
 src/llm_config.py
-
+src/model/llama_agent_framework.ipynb
 .DS_Store
 
 # conda env

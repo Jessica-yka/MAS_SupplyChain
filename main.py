@@ -10,15 +10,15 @@ import numpy as np
 from typing import List
 from tqdm import tqdm
 from autogen import ConversableAgent
-sys.path.append('src')
-from env import env_creator
-from config import env_configs, get_env_configs
-from llm_config import llm_config_list
+# sys.path.append('src')
+from src.model.env import env_creator
+from src.model.config import env_configs, get_env_configs
+from src.model.llm_config import llm_config_list
 from openai import AzureOpenAI
-from mas_model import create_agents
-from mas_model import run_simulation
-from utils import get_demand_description, get_state_description
-from utils import clear_dir
+from src.model.mas_model import create_agents
+from src.model.mas_model import run_simulation
+from src.model.utils import get_demand_description, get_state_description
+from src.model.utils import clear_dir
 np.random.seed(42)
 
 # %%
