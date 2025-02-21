@@ -7,8 +7,8 @@ InvAgent is a novel approach leveraging large language models (LLMs) to manage m
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/zefang-liu/InvAgent.git
-   cd InvAgent
+   git clone https://github.com/Jessica-yka/MAS_SupplyChain.git
+   cd MAS_SupplyChain
    ```
 
 2. Install the required packages:
@@ -19,7 +19,7 @@ InvAgent is a novel approach leveraging large language models (LLMs) to manage m
 
 ## Usage
 
-### Running Experiments
+<!-- ### Running Experiments
 
 - To run the AutoGen experiments, use `notebooks/autogen.ipynb`. Note that an `OPENAI_API_KEY` is required as an environment variable.
 
@@ -45,7 +45,7 @@ If you find this repository useful in your research, please consider citing our 
 
 ## Contact Us
 
-For more information or any inquiries, please feel free to [raise an issue](https://github.com/zefang-liu/InvAgent/issues) or [contact us](mailto:yquan9@gatech.edu) directly.
+For more information or any inquiries, please feel free to [raise an issue](https://github.com/zefang-liu/InvAgent/issues) or [contact us](mailto:yquan9@gatech.edu) directly. -->
 
 ## License
 
