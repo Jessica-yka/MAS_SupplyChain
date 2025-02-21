@@ -1,4 +1,4 @@
-# :robot: InvAgent: A LLM-based Multi-Agent System for Inventory Management in Supply Chains
+<!-- # :robot: InvAgent: A LLM-based Multi-Agent System for Inventory Management in Supply Chains
 
 InvAgent is a novel approach leveraging large language models (LLMs) to manage multi-agent inventory systems. It enhances resilience and improves efficiency across the supply chain network through zero-shot learning capabilities, enabling adaptive and informed decision-making without prior training. For more detailed information, please check our [paper](https://arxiv.org/abs/2407.11384).
 
@@ -17,7 +17,7 @@ InvAgent is a novel approach leveraging large language models (LLMs) to manage m
    pip install -r requirements.txt
    ```
 
-## Usage
+## Usage -->
 
 <!-- ### Running Experiments
 
@@ -47,6 +47,6 @@ If you find this repository useful in your research, please consider citing our 
 
 For more information or any inquiries, please feel free to [raise an issue](https://github.com/zefang-liu/InvAgent/issues) or [contact us](mailto:yquan9@gatech.edu) directly. -->
 
-## License
+<!-- ## License
 
-This project is licensed under the Apache-2.0 license. See the [LICENSE](LICENSE) file for details.
+This project is licensed under the Apache-2.0 license. See the [LICENSE](LICENSE) file for details. -->
