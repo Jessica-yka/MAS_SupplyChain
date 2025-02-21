@@ -12,7 +12,7 @@ from gymnasium import spaces
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 
 from config import env_configs, get_env_configs
-from utils import visualize_state, parse_stage_agent_id, clear_dir
+from model.utils.utils import visualize_state, parse_stage_agent_id, clear_dir
 from data_simulation import generate_sup_dem_relations
 import os
 import copy

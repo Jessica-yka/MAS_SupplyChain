@@ -163,13 +163,18 @@ runs/
 notebooks/draft.ipynb
 draft.ipynb
 src/KDD-Tutorial-2-Let-Your-Graph-Do-The-Talking.ipynb
+src/gnn/useless_old_trash
+src/gnn/data_generation.ipynb
 
+wandb/
+src/gnn/gnn_dataset
 *.txt
 
 # api keys
-src/llm_config.py
-src/model/llama_agent_framework.ipynb
+src/model/llm_config.py
+
 .DS_Store
+output
 
 # conda env
 uist2025/

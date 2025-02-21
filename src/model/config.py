@@ -2,23 +2,23 @@
 Environment Configurations
 """
 import numpy as np
-from model.data_simulation import generate_lead_time, generate_prod_capacity
-from model.data_simulation import generate_cost_price, generate_sup_dem_relations
-from model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
-from model.data_simulation import Demand_fn
+from src.model.data_simulation import generate_lead_time, generate_prod_capacity
+from src.model.data_simulation import generate_cost_price, generate_sup_dem_relations
+from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
+from src.model.data_simulation import Demand_fn
 import os
-from model.utils import save_dict_to_json
+from model.utils.utils import save_dict_to_json, clear_dir
 from collections import defaultdict
 
 np.random.seed(0)
 
-env_configs = {
+env_configs_list = {
     "large_graph_test": {
         "config_name": "large_graph_test",
         "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 2,
-        "num_init_customers": 2,
-        "num_agents_per_stage": 30, # >= 2
+        "num_init_suppliers": 3,
+        "num_init_customers": 3,
+        "num_agents_per_stage": 20, # >= 2
         "num_periods": 20,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
@@ -88,13 +88,23 @@ env_configs = {
 }
 
 def get_env_configs(env_configs: dict):
+
+    env_config_name = env_configs_list['config_name']
+    # create the dir to store the results
+    os.makedirs(f"../../results/{env_config_name}", exist_ok=True)
+    clear_dir(f"../../results/{env_config_name}")
+    # crate the dir to store the env setup
+    os.makedirs(f"../../env/{env_config_name}", exist_ok=True)
+    clear_dir(f"../../env/{env_config_name}")
     
-    save_dict_to_json(data=env_configs, save_path=env_configs['config_name'])
+
+    save_dict_to_json(data=env_configs, save_path=f"../../env/{env_config_name}/config.json")
     num_stages = env_configs["num_stages"]
     num_agents_per_stage = env_configs["num_agents_per_stage"]
     num_periods = env_configs["num_periods"]
     num_total_agents = num_stages * num_agents_per_stage
     num_init_suppliers = env_configs["num_init_suppliers"]
+
 
     supply_relations, demand_relations = \
         generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, \

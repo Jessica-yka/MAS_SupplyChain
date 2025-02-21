@@ -1,4 +1,4 @@
-from utils import get_state_description, get_demand_description
+from model.utils.utils import get_state_description, get_demand_description
 from env import InventoryManagementEnv
 
 task1_msg = (
