@@ -2,10 +2,19 @@ import json
 import pandas as pd
 import torch
 from torch.utils.data import Dataset
-
+import sys
+sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
+from src.gnn.gnn_dataset.utils.retrieval import retrieval_via_pcst
+import os
+from tqdm import tqdm
 
 PATH = 'src/gnn/gnn_dataset/large_graph_test'
+path_nodes = f'{PATH}/nodes'
+path_edges = f'{PATH}/edges'
+path_graphs = f'{PATH}/graphs'
 
+cached_graph = f'{PATH}/cached_graphs'
+cached_desc = f'{PATH}/cached_desc'
 
 class SupplyChainGraphsDataset(Dataset):
     def __init__(self):
@@ -22,13 +31,19 @@ class SupplyChainGraphsDataset(Dataset):
 
     def __getitem__(self, index):
 
-
-        graph = torch.load(f'{PATH}/graphs/{index}.pt')
         question = self.text.loc[index, 'question']
         label = self.text.loc[index, 'label']
-        nodes = pd.read_csv(f'{PATH}/nodes/{index}.csv')
-        edges = pd.read_csv(f'{PATH}/edges/{index}.csv')
-        desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
+        graph_idx = int(self.text.loc[index, 'graph_idx'])
+
+        
+        # nodes = pd.read_csv(f'{PATH}/nodes/{graph_idx}.csv')
+        # edges = pd.read_csv(f'{PATH}/edges/{graph_idx}.csv')
+
+        # graph = torch.load(f'{PATH}/graphs/{graph_idx}.pt')        
+        # desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
+
+        graph = torch.load(f'{cached_graph}/{graph_idx}.pt')
+        desc = open(f'{cached_desc}/{index}.txt', 'r').read()
 
         return {
             'id': index,
@@ -53,7 +68,28 @@ class SupplyChainGraphsDataset(Dataset):
         return {'train': train_indices, 'val': val_indices, 'test': test_indices}
 
 
+def preprocess():
+    os.makedirs(cached_desc, exist_ok=True)
+    os.makedirs(cached_graph, exist_ok=True)
+
+    questions = pd.read_csv(f'{PATH}/all_questions.csv')
+    q_embs = torch.load(f'{PATH}/q_embs.pt')
+    for index in tqdm(range(len(questions))):
+        graph_idx = questions.iloc[index]['graph_idx']
+        # if os.path.exists(f'{cached_graph}/{graph_idx}.pt'
+        #     continue
+        
+        graph = torch.load(f'{path_graphs}/{graph_idx}.pt')
+        nodes = pd.read_csv(f'{path_nodes}/{graph_idx}.csv')
+        edges = pd.read_csv(f'{path_edges}/{graph_idx}.csv')
+        subg, desc = retrieval_via_pcst(graph, q_embs[index], nodes, edges, topk=6, topk_e=6, cost_e=0.5)
+        torch.save(subg, f'{cached_graph}/{graph_idx}.pt')
+        open(f'{cached_desc}/{index}.txt', 'w').write(desc)
+
+
 if __name__ == '__main__':
+
+    preprocess()
     dataset = SupplyChainGraphsDataset()
 
     data = dataset[0]

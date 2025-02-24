@@ -1,8 +1,8 @@
 import numpy as np
 import os
 import re
-from model.utils.utils import save_array, extract_pairs
-from model.utils.utils import random_relations
+from src.model.utils.utils import save_array, extract_pairs
+from src.model.utils.utils import random_relations
 
 def generate_lead_time(dist: tuple, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
     assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."

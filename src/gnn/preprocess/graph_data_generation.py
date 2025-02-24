@@ -19,7 +19,7 @@ import time
 sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.model.config import env_configs_list, get_env_configs
-from model.utils.utils import clear_dir, split_demand, save_data_to_json, read_data_from_json
+from src.model.utils.utils import clear_dir, split_demand, save_data_to_json, read_data_from_json
 from src.model.data_simulation import generate_lead_time, generate_prod_capacity
 from src.model.data_simulation import generate_cost_price, generate_sup_dem_relations
 from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
@@ -254,16 +254,6 @@ def convert_env_to_edge_df(env: dict, event_dict: dict):
                     # df_edge.loc[edge_idx, ["source", "target", "label", 'type', 'aspect']] = \
                     #     [f"stage_{m+1}_agent_{i}", f"stage_{m}_agent_{x}", "potential supplier", '', []]
 
-    # # create a column named "is_backlog" to indicate whether the edge is related to backlog
-    # df_edge['is_backlog'] = df_edge['aspect'].apply(lambda x: 'Backlog' in x)
-    # # create a column named "is_price" to indicate whether the edge is related to price
-    # df_edge['is_price'] = df_edge['aspect'].apply(lambda x: 'Price' in x)
-    # # create a column named "is_demand" to indicate whether the edge is related to demand
-    # df_edge['is_demand'] = df_edge['aspect'].apply(lambda x: 'Demand' in x)
-    # # create a column named "is_delivery_time" to indicate whether the edge is related to delivery time
-    # df_edge['is_delivery_time'] = df_edge['aspect'].apply(lambda x: 'Delivery Time' in x)
-    # # create a column named "is_production" to indicate whether the edge is related to production
-    # df_edge['is_production_capacity'] = df_edge['aspect'].apply(lambda x: 'Production Capacity' in x)
     
     return df_edge
 
@@ -348,7 +338,7 @@ def generate_target_node(num_stages: int, num_agents_per_stage: int):
 
 def generate_orderFulfill_questions(target_node:str, event_node:str, event_type: str):
 
-    question = f"Your are {target_node}. Based on the provided supply chain graph, how is the performance of your supplier {event_node} in terms of order fulfillment? Answer either 'positive', 'negative'."
+    question = f"Your are {target_node}. Based on the provided supply chain graph, how is the performance of your supplier {event_node} in terms of order fulfillment? Answer either 'positive' or 'negative'."
     answer = "positive" if event_type == "Positive" else "negative"
 
     return question, answer
@@ -359,12 +349,14 @@ def generate_questions(df_edges: pd.DataFrame, env: dict, num_questions:int=20):
     num_stages = env['num_stages']
     num_agents_per_stage = env['num_agents_per_stage']
     aspect_list = ["Production Capacity", "Delivery Time", "Order Fulfillment", "Price", "Demand"]
+    up_aspect_list = ["Production Capacity", "Delivery Time", "Order Fulfillment", "Price"]
+    down_aspect_list = ["Demand"]
 
     # make a list of list to list
     event_aspect_in_graph = []
     for x in df_edges['aspect']:
         event_aspect_in_graph += x
-    event_aspect_in_graph = list(set(event_aspect_in_graph)) + ["Order Fulfillment"]
+    event_aspect_in_graph = list(set(event_aspect_in_graph))
     # event_aspect_in_graph + ["Order Fulfillment" for _ in event_aspect_in_graph] # To balance the question ratio
     num_event_aspect_in_graph = len(event_aspect_in_graph)
     
@@ -404,16 +396,23 @@ def generate_questions(df_edges: pd.DataFrame, env: dict, num_questions:int=20):
             answers.append(answer)
         # Other events
         elif check_connection(G=G, event_target_node=event_target_node, target_node=event_target_node):
-            asp = random.choice(aspect_list)
+            
             node_rel = random.choice(['upstream suppliers reliability', "downstream customers demand"])
+            if 'supplier' in node_rel:
+                asp = random.choice(up_aspect_list)
+            else:
+                asp = random.choice(down_aspect_list)
             questions.append(f"Your are {target_node}. Based on the provided supply chain graph, how would the {event_node} affect any of your {node_rel} in terms of {asp}? Answer either 'positive' or 'negative' if it happens to your supplier(s), otherwise answer'neutral'.")
-            if asp in event_aspect and event_target_node_relation == node_rel:
+            if asp in event_aspect and event_target_node_relation in node_rel:
                 answers.append("positive" if event_type == "Positive" else "negative")
             else:
                 answers.append("neutral")
         else:
-            asp = random.choice(aspect_list)
             node_rel = random.choice(['upstream suppliers reliability', "downstream customers demand"])
+            if 'supplier' in node_rel:
+                asp = random.choice(up_aspect_list)
+            else:
+                asp = random.choice(down_aspect_list)
             questions.append(f"Your are {target_node}. Based on the provided supply chain graph, how would the {event_node} affect any of your {node_rel} in terms of {asp}? Answer either 'positive' or 'negative' if it happens to your supplier(s), otherwise answer'neutral'.")
             answers.append("neutral")
 
@@ -425,8 +424,8 @@ def generate_questions(df_edges: pd.DataFrame, env: dict, num_questions:int=20):
 
 if __name__ == "__main__":
 
-    num_graphs = 3000
-    num_questions_per_graph = 10
+    num_graphs = 2000
+    num_questions_per_graph = 5
     events_list = read_data_from_json(read_path="src/gnn/gnn_dataset/supply_chain_events.json")
     event_dict = {"events": [x[0] for x in events_list[1:]],
                 "Type": [x[1] for x in events_list[1:]],
@@ -461,7 +460,7 @@ if __name__ == "__main__":
 
         questions, answers = generate_questions(df_edges=df_edges, env=env, num_questions=num_questions_per_graph)
         # save questions and answers to csv
-        df_qa = pd.concat([df_qa, pd.DataFrame({"question": questions, "label": answers})], axis=0)
+        df_qa = pd.concat([df_qa, pd.DataFrame({"question": questions, "label": answers, 'graph_idx': [data_idx for _ in range(num_questions_per_graph)]})], axis=0)
         
         # %%
         # visualize_contextualized_supply_chain(env=env, event_dict=event_dict, df_edges=df_edges, df_nodes=df_nodes)
@@ -475,8 +474,7 @@ if __name__ == "__main__":
         # 4,good thing
 
         df_nodes.head()
-        for i in range(num_questions_per_graph):
-            df_nodes.to_csv(f"{save_path}/{env_config_name}/nodes/{data_idx*num_questions_per_graph+i}.csv", index=False)
+        df_nodes.to_csv(f"{save_path}/{env_config_name}/nodes/{data_idx}.csv", index=False)
 
         # %%
         # src,edge_attr,dst
@@ -490,9 +488,9 @@ if __name__ == "__main__":
             "edge_attr": df_edges['label'],
             "dst": [node_id_name_map[x] for x in df_edges['target']]
             })
-        for i in range(num_questions_per_graph):
-            df_simp_edges.to_csv(f"{save_path}/{env_config_name}/edges/{data_idx*num_questions_per_graph+i}.csv", index=False)
+        df_simp_edges.to_csv(f"{save_path}/{env_config_name}/edges/{data_idx}.csv", index=False)
 
+    df_qa['graph_idx'] = df_qa['graph_idx'].astype(int)
     df_qa.to_csv(f"{save_path}/{env_config_name}/all_questions.csv", index=False)
 
 

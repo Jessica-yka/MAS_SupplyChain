@@ -3,6 +3,7 @@ import torch
 import torch.nn as nn
 from torch.cuda.amp import autocast as autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import BitsAndBytesConfig
 from torch_scatter import scatter
 from src.model.gnn import load_gnn_model
 from peft import (
@@ -37,6 +38,7 @@ class GraphLLM(torch.nn.Module):
         # }
         kwargs = {
             "max_memory": {0: '20GiB'},
+            "device_map": "auto",
             "revision": "main",
         }
         print("kwargs", kwargs)
@@ -48,12 +50,16 @@ class GraphLLM(torch.nn.Module):
         self.tokenizer.pad_token_id = 0
         self.tokenizer.padding_side = 'left'
 
+        # Configure quantization using BitsAndBytesConfig
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,  # Use 8-bit quantization
+            llm_int8_threshold=4.0,  # Optional: Adjust this threshold for lower memory usage
+        )
         
         model = AutoModelForCausalLM.from_pretrained(
             args.llm_model_path,
-            torch_dtype=torch.float16,
-            low_cpu_mem_usage=True,
-            **kwargs
+            quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
+            device_map="auto",              # Automatically map the model to GPU(s)
         )
 
         if args.llm_frozen == 'True':
@@ -134,8 +140,8 @@ class GraphLLM(torch.nn.Module):
         # encode special tokens
         eos_tokens = self.tokenizer(EOS, add_special_tokens=False)
         eos_user_tokens = self.tokenizer(EOS_USER, add_special_tokens=False)
-        bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0])
-        pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id)).unsqueeze(0)
+        bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0].to(self.model.device))
+        pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id).to(self.model.device)).unsqueeze(0)
 
         # encode graphs
         graph_embeds = self.encode_graphs(samples)
@@ -148,7 +154,8 @@ class GraphLLM(torch.nn.Module):
         for i in range(batch_size):
             # Add bos & eos token
             label_input_ids = labels.input_ids[i][:self.max_new_tokens] + eos_tokens.input_ids
-            input_ids = descriptions.input_ids[i][:self.max_txt_len] + questions.input_ids[i] + eos_user_tokens.input_ids + label_input_ids
+            
+            input_ids = descriptions.input_ids[i][:self.max_txt_len] + questions.input_ids[i] + eos_user_tokens.input_ids + label_input_ids # description length is roughly 500~1200
             inputs_embeds = self.word_embedding(torch.tensor(input_ids).to(self.model.device))
             inputs_embeds = torch.cat([bos_embeds, graph_embeds[i].unsqueeze(0), inputs_embeds], dim=0)
 
@@ -187,8 +194,8 @@ class GraphLLM(torch.nn.Module):
 
         # encode special tokens
         eos_user_tokens = self.tokenizer(EOS_USER, add_special_tokens=False)
-        bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0])
-        pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id)).unsqueeze(0)
+        bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0].to(self.model.device))
+        pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id).to(self.model.device)).unsqueeze(0)
 
         # encode graphs
         graph_embeds = self.encode_graphs(samples)

@@ -29,11 +29,6 @@ class LLM(torch.nn.Module):
         self.max_new_tokens = args.max_new_tokens
 
         print('Loading LLAMA')
-        # kwargs = {
-        #     "max_memory": {i: f'{size}GiB' for i, size in enumerate(args.max_memory)},
-        #     "device_map": "auto",
-        #     "revision": "main",
-        # }
 
         kwargs = {
             "max_memory": {0: '20GiB'},
@@ -48,8 +43,8 @@ class LLM(torch.nn.Module):
 
         # Configure quantization using BitsAndBytesConfig
         bnb_config = BitsAndBytesConfig(
-            load_in_8bit=True,  # Use 8-bit quantization
-            llm_int8_threshold=6.0,  # Optional: Adjust this threshold for lower memory usage
+            load_in_4bit=True,  # Use 4-bit quantization
+            llm_int8_threshold=4.0,  # Optional: Adjust this threshold for lower memory usage
         )
         # model = AutoModelForCausalLM.from_pretrained(
         #     args.llm_model_path,
@@ -62,8 +57,7 @@ class LLM(torch.nn.Module):
             quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
             device_map="auto",              # Automatically map the model to GPU(s)
         )
-        print("model device", model.device)
-        # exit()
+
 
         if args.llm_frozen == 'True':
             print("Freezing LLAMA!")
@@ -120,7 +114,7 @@ class LLM(torch.nn.Module):
         eos_user_tokens = self.tokenizer(EOS_USER, add_special_tokens=False)
         bos_embeds = self.word_embedding(self.tokenizer(BOS, add_special_tokens=False, return_tensors='pt').input_ids[0])
         pad_embeds = self.word_embedding(torch.tensor(self.tokenizer.pad_token_id)).unsqueeze(0)
-        print("pad embeds device", pad_embeds.device)
+
 
         batch_size = len(samples['id'])
         batch_inputs_embeds = []

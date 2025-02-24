@@ -30,8 +30,9 @@ def main(args):
 
     # Step 2: Build Node Classification Dataset
     test_dataset = [dataset[i] for i in idx_split['test']]
+    # test_dataset = [dataset[i] for i in idx_split['train']] # TODO: change to test
     test_loader = DataLoader(test_dataset, batch_size=args.eval_batch_size, drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
-
+    
     # Step 3: Build Model
     args.llm_model_path = llama_model_path[args.llm_model_name]
     model = load_model[args.model_name](graph=dataset.graph, graph_type=dataset.graph_type, args=args)
@@ -44,17 +45,14 @@ def main(args):
     model.eval()
     progress_bar_test = tqdm(range(len(test_loader)))
 
-    # with open(path, "w") as f:
-    df = pd.DataFrame({"id": [], "pred": [], "label": [], "question": [], "desc": []})
-    for _, batch in enumerate(test_loader):
-        with torch.no_grad():
-            output = model.inference(batch)
-            df_batch = pd.DataFrame(output)
-            df = pd.concat([df, df_batch], ignore_index=True)
-            df.to_csv(path, index=False)
-        progress_bar_test.update(1)
-    # df.reset_index(drop=True, inplace=True)
-    # df.to_csv(path, index=False)
+    with open(path, "w") as f:
+        for _, batch in enumerate(test_loader):
+            with torch.no_grad():
+                output = model.inference(batch)
+                df = pd.DataFrame(output)
+                for _, row in df.iterrows():
+                    f.write(json.dumps(dict(row)) + "\n")
+            progress_bar_test.update(1)
 
     # Step 5. Post-processing & Evaluating
     acc = eval_funcs[args.dataset](path)

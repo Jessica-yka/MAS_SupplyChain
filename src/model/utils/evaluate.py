@@ -25,6 +25,18 @@ def get_accuracy_expla_graphs(path):
 
     return correct / len(df)
 
+def get_accuracy_sc_graphs(path):
+    df = pd.read_json(path, lines=True)
+    # df = pd.read_csv(path)
+    # compute accuracy
+    correct = 0
+    for pred, label in zip(df["pred"], df["label"]):
+        matches = re.findall(r"positive|Positive|negative|Negative|neutral|Neutral", pred.strip())
+        if len(matches) > 0 and matches[0].lower() == label:
+            correct += 1
+
+    return correct / len(df)
+
 
 def normalize(s: str) -> str:
     """Lower text and remove punctuation, articles and extra whitespace."""
@@ -117,6 +129,7 @@ def get_accuracy_webqsp(path):
 
 
 eval_funcs = {
+    "supplychain_graphs": get_accuracy_sc_graphs,
     "expla_graphs": get_accuracy_expla_graphs,
     "scene_graphs": get_accuracy_gqa,
     "scene_graphs_baseline": get_accuracy_gqa,

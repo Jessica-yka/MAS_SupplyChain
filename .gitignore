@@ -160,7 +160,7 @@ cython_debug/
 # Project
 results/
 runs/
-notebooks/draft.ipynb
+notebooks/
 draft.ipynb
 src/KDD-Tutorial-2-Let-Your-Graph-Do-The-Talking.ipynb
 src/gnn/useless_old_trash

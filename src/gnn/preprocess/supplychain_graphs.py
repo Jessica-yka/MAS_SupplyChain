@@ -18,15 +18,20 @@ parser.add_argument('--dataset', type=str, default='large_graph_test')
 args = parser.parse_args()
 model_name = 'sbert'
 path = f'src/gnn/gnn_dataset/{args.dataset}'
-num_data = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
-
+num_graph = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
+num_data_per_graph = 5
+num_data = num_graph * num_data_per_graph
 
 def generate_text_embedding():
+
+    def _encode_questions():
+        q_embs = text2embedding(model, tokenizer, device, df.question.tolist())
+        torch.save(q_embs, f'{path}/q_embs.pt')
 
     def _encode_graph():
         print('Encoding graphs...')
         os.makedirs(f'{path}/graphs', exist_ok=True)
-        for i in tqdm(range(num_data)):
+        for i in tqdm(range(num_graph)):
             nodes = pd.read_csv(f'{path}/nodes/{i}.csv')
             edges = pd.read_csv(f'{path}/edges/{i}.csv')
             x = text2embedding(model, tokenizer, device, nodes.node_attr.tolist())
@@ -35,10 +40,20 @@ def generate_text_embedding():
             data = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(nodes))
             torch.save(data, f'{path}/graphs/{i}.pt')
 
+    # model, tokenizer, device = load_model[model_name]()
+    # text2embedding = load_text2embedding[model_name]
+
+    # _encode_graph()
+
+    df = pd.read_csv(f'{path}/all_questions.csv')
+    os.makedirs(f'{path}/graphs/', exist_ok=True)
     model, tokenizer, device = load_model[model_name]()
     text2embedding = load_text2embedding[model_name]
 
+    _encode_questions()
     _encode_graph()
+
+
 
 
 if __name__ == '__main__':

@@ -33,19 +33,24 @@ def main(args):
     idx_split = dataset.get_idx_split()
 
     # Step 2: Build Node Classification Dataset
-    train_dataset = [dataset[i] for i in idx_split['train']]
-    val_dataset = [dataset[i] for i in idx_split['val']]
-    test_dataset = [dataset[i] for i in idx_split['test']]
+    print("Build Node Classification Dataset")
+    train_dataset = [dataset[i] for i in idx_split['train'][:8000]]
+    print("load val dataset")
+    val_dataset = [dataset[i] for i in idx_split['val'][:1000]]
+    print("load test dataset")
+    test_dataset = [dataset[i] for i in idx_split['test'][:1000]]
 
-    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, drop_last=True, pin_memory=True, shuffle=True, collate_fn=collate_fn)
-    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
-    test_loader = DataLoader(test_dataset, batch_size=args.eval_batch_size, drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
+    train_loader = DataLoader(train_dataset, batch_size=args.batch_size, drop_last=True, pin_memory=False, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_dataset, batch_size=args.batch_size, drop_last=False, pin_memory=False, shuffle=False, collate_fn=collate_fn)
+    test_loader = DataLoader(test_dataset, batch_size=args.eval_batch_size, drop_last=False, pin_memory=False, shuffle=False, collate_fn=collate_fn)
 
     # Step 3: Build Model
+    print("Load llama from the path")
     args.llm_model_path = llama_model_path[args.llm_model_name]
-    model = load_model[args.model_name](graph_type=dataset.graph_type, args=args, init_prompt=dataset.prompt)
+    model = load_model[args.model_name](graph_type=dataset.graph_type, args=args) # remove ", init_prompt=dataset.prompt" from the parameter list
 
     # Step 4 Set Optimizer
+    print("Set Optimizer")
     params = [p for _, p in model.named_parameters() if p.requires_grad]
     optimizer = torch.optim.AdamW(
         [{'params': params, 'lr': args.lr, 'weight_decay': args.wd}, ],
@@ -55,6 +60,7 @@ def main(args):
     print(f"trainable params: {trainable_params} || all params: {all_param} || trainable%: {100 * trainable_params / all_param}")
 
     # Step 5. Training
+    print("Training starts.")
     num_training_steps = args.num_epochs * len(train_loader)
     progress_bar = tqdm(range(num_training_steps))
     best_val_loss = float('inf')

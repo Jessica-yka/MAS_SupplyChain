@@ -7,7 +7,7 @@ from src.model.data_simulation import generate_cost_price, generate_sup_dem_rela
 from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
 from src.model.data_simulation import Demand_fn
 import os
-from model.utils.utils import save_dict_to_json, clear_dir
+from src.model.utils.utils import save_dict_to_json, clear_dir
 from collections import defaultdict
 
 np.random.seed(0)

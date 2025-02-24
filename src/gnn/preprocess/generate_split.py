@@ -7,7 +7,7 @@ def generate_split(num_nodes, path):
 
     # Split the dataset into train, val, and test sets
     indices = np.arange(num_nodes)
-    train_indices, temp_data = train_test_split(indices, test_size=0.4, random_state=42)
+    train_indices, temp_data = train_test_split(indices, test_size=0.2, random_state=42)
     val_indices, test_indices = train_test_split(temp_data, test_size=0.5, random_state=42)
     print("# train samples: ", len(train_indices))
     print("# val samples: ", len(val_indices))

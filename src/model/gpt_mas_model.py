@@ -7,10 +7,10 @@ from typing import List
 from tqdm.notebook import tqdm
 from autogen import ConversableAgent
 from llm_config import llm_config_list
-from model.utils.utils import extract_pairs
-from form_msg import generate_msg
-from model.utils.utils import visualize_state, save_string_to_file
-from model.utils.utils import update_sup_action
+from src.model.utils.utils import extract_pairs
+from src.model.form_msg import generate_msg
+from src.model.utils.utils import visualize_state, save_string_to_file
+from src.model.utils.utils import update_sup_action
 
 np.random.seed(0)
 
