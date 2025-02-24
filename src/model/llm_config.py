@@ -44,8 +44,8 @@ def parse_args_llama():
     parser.add_argument("--llm_frozen", type=str, default='True')
     parser.add_argument("--llm_num_virtual_tokens", type=int, default=10)
     parser.add_argument("--output_dir", type=str, default='output')
-    parser.add_argument("--max_txt_len", type=int, default=2048)
-    parser.add_argument("--max_new_tokens", type=int, default=1024)
+    parser.add_argument("--max_txt_len", type=int, default=512)
+    parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--max_memory", type=csv_list, default=[20])
 
     # GNN related

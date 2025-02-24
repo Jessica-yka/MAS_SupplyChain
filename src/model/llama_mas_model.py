@@ -25,7 +25,7 @@ from peft import (
     prepare_model_for_kbit_training,
 )
 from src.model.utils.utils import extract_pairs
-from src.model.form_msg import generate_msg
+from src.model.utils.generate_llama_message import generate_questions, generate_graph_desc
 from src.model.utils.utils import visualize_state, save_string_to_file
 from src.model.utils.utils import update_sup_action
 
@@ -115,11 +115,15 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                     # wandb.log({"message": message})
 
                     # TODO: Formulate question and prompt without making a test dataloader
-                    
+                    # model
                     model = user_proxy[0]
                     model.eval()
+                    # question
+                    question = generate_questions(stage=stage_id, im_env=im_env, enable_graph_change=enable_graph_change, enable_price_change=enable_price_change)
+                    # edges
+                    desc = generate_graph_desc()
 
-                    output = model.inference()
+                    output = model.inference(batch=[question])
                     # print(chat_summary)
                     match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
 

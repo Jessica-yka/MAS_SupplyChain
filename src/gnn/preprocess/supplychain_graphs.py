@@ -18,9 +18,11 @@ parser.add_argument('--dataset', type=str, default='large_graph_test')
 args = parser.parse_args()
 model_name = 'sbert'
 path = f'src/gnn/gnn_dataset/{args.dataset}'
-num_graph = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
-num_data_per_graph = 5
-num_data = num_graph * num_data_per_graph
+# num_graph = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
+# num_data_per_graph = 5
+# num_data = num_graph * num_data_per_graph
+num_data = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
+
 
 def generate_text_embedding():
 
@@ -31,7 +33,7 @@ def generate_text_embedding():
     def _encode_graph():
         print('Encoding graphs...')
         os.makedirs(f'{path}/graphs', exist_ok=True)
-        for i in tqdm(range(num_graph)):
+        for i in tqdm(range(num_data)):
             nodes = pd.read_csv(f'{path}/nodes/{i}.csv')
             edges = pd.read_csv(f'{path}/edges/{i}.csv')
             x = text2embedding(model, tokenizer, device, nodes.node_attr.tolist())

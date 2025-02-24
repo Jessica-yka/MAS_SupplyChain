@@ -144,7 +144,7 @@ print("CSV file 'supply_chain_events.csv' created successfully!")
 
 # %%
     
-def visualize_contextualized_supply_chain(env: dict, event_dict: dict, df_edges: pd.DataFrame, df_nodes: pd.DataFrame):
+def visualize_contextualized_supply_chain(env: dict, event_dict: dict, df_edges: pd.DataFrame, df_nodes: pd.DataFrame, path: str):
     
     num_stages = env['num_stages']
     num_agents_per_stage = env['num_agents_per_stage']
@@ -174,9 +174,52 @@ def visualize_contextualized_supply_chain(env: dict, event_dict: dict, df_edges:
     plt.figure(figsize=(20, 16))
     nx.draw(M, pos, with_labels=True, node_color=colors, node_size=1000, font_size=12, edge_color="gray", alpha=1)
     nx.draw_networkx_edge_labels(M, pos, edge_labels=edge_labels, font_size=10)
-    plt.show()
+    # plt.show()
+    plt.savefig(path)
 
-# %%
+
+def visualize_contextualized_supply_chain_subgraph(env: dict, event_dict: dict, df_edges: pd.DataFrame, df_nodes: pd.DataFrame, target_node: str, path: str):
+    
+    num_stages = env['num_stages']
+    num_agents_per_stage = env['num_agents_per_stage']
+    stage_name_id = dict(zip(env['stage_names'], range(num_stages)))
+    M = nx.DiGraph()
+
+    # Add all nodes to the graph
+    for i in range(len(df_nodes)):
+        if df_nodes['type'][i] == "event":
+            M.add_node(df_nodes['node_attr'][i], type="event")
+        else:
+            M.add_node(df_nodes['node_attr'][i], type=num_stages-1-stage_name_id[df_nodes['type'][i]])
+
+    # Add edges to the graph if
+    # supply relation nodes
+    # the deliverying and ordering between the target and its downstream/upstream
+    for i in range(len(df_edges)):
+        source = df_edges['source'][i]
+        target = df_edges['target'][i]
+        label = df_edges['label'][i]
+        if label == 'is the supplier of' or label == 'affects':
+            M.add_edge(source, target, label=label)
+        elif source == target_node or target == target_node:
+            M.add_edge(source, target, label=label)
+
+    # Define positions for the multipartite layout
+    pos = nx.multipartite_layout(M, subset_key="type")
+    edge_labels = nx.get_edge_attributes(M, "label") # Get edge labels
+    # Draw the multipartite graph
+    # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
+    stage_colors = {0: "gold", 1: "violet", 2: "limegreen", 3:"darkorange", "event": "blue"}
+    colors = [stage_colors[m.get("type")] for m in M.nodes.values()]
+
+
+    plt.figure(figsize=(20, 16))
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=1000, font_size=12, edge_color="gray", alpha=1)
+    nx.draw_networkx_edge_labels(M, pos, edge_labels=edge_labels, font_size=10)
+    # plt.show()
+    plt.savefig(path)
+    plt.close()
+
 
 def assign_events(num_events: int, num_stages: int, num_agents_per_stage: int):
     num_current_events = random.choice(range(1, 4))
@@ -247,7 +290,7 @@ def convert_env_to_edge_df(env: dict, event_dict: dict):
             for i in range(num_agents_per_stage):
                 if sup_rel[m][x][i] == 1:
                     df_edge.loc[edge_idx, ["source", "target", "label", 'type', 'aspect']] = \
-                        [f"stage_{m+1}_agent_{i}", f"stage_{m}_agent_{x}", "is supplier", "", []]
+                        [f"stage_{m+1}_agent_{i}", f"stage_{m}_agent_{x}", "is the supplier of", "", []]
                     edge_idx += 1
                 else:
                     pass
@@ -258,6 +301,7 @@ def convert_env_to_edge_df(env: dict, event_dict: dict):
     return df_edge
 
 def build_event_graph(df_edges: pd.DataFrame, df_nodes: pd.DataFrame):
+
     G = nx.DiGraph()
     for i in range(len(df_nodes)):
         G.add_node(df_nodes['node_attr'][i], type=df_nodes['type'][i])
@@ -343,7 +387,19 @@ def generate_orderFulfill_questions(target_node:str, event_node:str, event_type:
 
     return question, answer
 
-def generate_questions(df_edges: pd.DataFrame, env: dict, num_questions:int=20):
+def save_sub_df_edges(df_edges: pd.DataFrame, target_node: str, path: str):
+
+    df_edges_sub = df_edges[(df_edges['source'] == target_node) | (df_edges['target'] == target_node) | (df_edges['label'] == 'affects') | (df_edges['label'] == 'is the supplier of')]
+    node_id_name_map = dict(zip(df_nodes['node_attr'].tolist(), df_nodes['node_id'].tolist()))
+    df_simp_edges = pd.DataFrame({
+        "src": [node_id_name_map[x] for x in df_edges_sub['source']],
+        "edge_attr": df_edges_sub['label'],
+        "dst": [node_id_name_map[x] for x in df_edges_sub['target']]
+        })
+    df_simp_edges.to_csv(path, index=False)
+
+
+def generate_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env: dict, data_idx:int, num_questions:int=10):
 
     
     num_stages = env['num_stages']
@@ -381,6 +437,11 @@ def generate_questions(df_edges: pd.DataFrame, env: dict, num_questions:int=20):
         while int(event_target_node.split("_")[1]) == target_node_stage_id and int(event_target_node.split("_")[3]) == target_node_agent_id:
             target_node_stage_id, target_node_agent_id = generate_target_node(num_stages=num_stages, num_agents_per_stage=num_agents_per_stage)
         target_node = f"stage_{target_node_stage_id}_agent_{target_node_agent_id}"
+        # print("target_node", target_node)
+        # Save the target-node-related graph as node df/edge df/graph/graph img
+        visualize_contextualized_supply_chain_subgraph(env=env, event_dict=event_dict, target_node=target_node, df_edges=df_edges, df_nodes=df_nodes, path=f"{save_path}/{env_config_name}/graph_imgs/{data_idx*num_questions+i}.png")
+        df_nodes.to_csv(f"{save_path}/{env_config_name}/nodes/{data_idx*num_questions+i}.csv", index=False)
+        save_sub_df_edges(df_edges=df_edges, target_node=target_node, path=f"{save_path}/{env_config_name}/edges/{data_idx*num_questions+i}.csv")
 
         if int(event_target_node.split("_")[1]) < target_node_stage_id: 
             event_target_node_relation = "customer"  
@@ -441,30 +502,31 @@ if __name__ == "__main__":
     clear_dir(f"{save_path}/{env_config_name}/edges")
     os.makedirs(f"{save_path}/{env_config_name}/graphs", exist_ok=True)
     clear_dir(f"{save_path}/{env_config_name}/graphs")
+    os.makedirs(f"{save_path}/{env_config_name}/graph_imgs", exist_ok=True)
+    clear_dir(f"{save_path}/{env_config_name}/graph_imgs")
 
     df_qa = pd.DataFrame({"question": [], "label": []})
+
 
     for data_idx in tqdm(range(num_graphs)):
         env = generate_env(env_config_name=env_config_name)
         num_stages = env['num_stages']
         num_agents_per_stage = env['num_agents_per_stage']
-        # %%
+
         events = assign_events(num_events, num_stages, num_agents_per_stage)
         env['events'] = events
         df_nodes = convert_env_to_node_df(env=env)
         df_edges = convert_env_to_edge_df(env=env, event_dict=event_dict)
 
-
-        # %%
         G = build_event_graph(df_edges=df_edges, df_nodes=df_nodes)
-
-        questions, answers = generate_questions(df_edges=df_edges, env=env, num_questions=num_questions_per_graph)
-        # save questions and answers to csv
-        df_qa = pd.concat([df_qa, pd.DataFrame({"question": questions, "label": answers, 'graph_idx': [data_idx for _ in range(num_questions_per_graph)]})], axis=0)
         
-        # %%
-        # visualize_contextualized_supply_chain(env=env, event_dict=event_dict, df_edges=df_edges, df_nodes=df_nodes)
-
+        questions, answers = generate_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
+        # save questions and answers to csv
+        df_qa = pd.concat([df_qa, pd.DataFrame({"question": questions, 
+                                                "label": answers, 
+                                                'graph_idx': np.arange(data_idx*num_questions_per_graph, (data_idx+1)*num_questions_per_graph)})], axis=0)
+        
+        
         # %%
         # node_id,node_attr
         # 0,cannabis
@@ -473,8 +535,6 @@ if __name__ == "__main__":
         # 3,more available
         # 4,good thing
 
-        df_nodes.head()
-        df_nodes.to_csv(f"{save_path}/{env_config_name}/nodes/{data_idx}.csv", index=False)
 
         # %%
         # src,edge_attr,dst
@@ -482,14 +542,7 @@ if __name__ == "__main__":
         # 2,causes,3
         # 1,capable of,4
         # 4,desires,2
-        node_id_name_map = dict(zip(df_nodes['node_attr'].tolist(), df_nodes['node_id'].tolist()))
-        df_simp_edges = pd.DataFrame({
-            "src": [node_id_name_map[x] for x in df_edges['source']],
-            "edge_attr": df_edges['label'],
-            "dst": [node_id_name_map[x] for x in df_edges['target']]
-            })
-        df_simp_edges.to_csv(f"{save_path}/{env_config_name}/edges/{data_idx}.csv", index=False)
-
+        
     df_qa['graph_idx'] = df_qa['graph_idx'].astype(int)
     df_qa.to_csv(f"{save_path}/{env_config_name}/all_questions.csv", index=False)
 

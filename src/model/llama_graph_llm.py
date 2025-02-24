@@ -1,5 +1,6 @@
 import contextlib
 import torch
+import time
 import torch.nn as nn
 from torch.cuda.amp import autocast as autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
@@ -88,7 +89,7 @@ class GraphLLM(torch.nn.Module):
 
         self.model = model
         print('Finish loading LLAMA!')
-
+        
         self.graph_encoder = load_gnn_model[args.gnn_model_name](
             in_channels=args.gnn_in_dim,
             out_channels=args.gnn_hidden_dim,
@@ -105,6 +106,7 @@ class GraphLLM(torch.nn.Module):
         ).to(self.model.device)
 
         self.word_embedding = self.model.model.get_input_embeddings()
+
 
     @property
     def device(self):
@@ -154,7 +156,6 @@ class GraphLLM(torch.nn.Module):
         for i in range(batch_size):
             # Add bos & eos token
             label_input_ids = labels.input_ids[i][:self.max_new_tokens] + eos_tokens.input_ids
-            
             input_ids = descriptions.input_ids[i][:self.max_txt_len] + questions.input_ids[i] + eos_user_tokens.input_ids + label_input_ids # description length is roughly 500~1200
             inputs_embeds = self.word_embedding(torch.tensor(input_ids).to(self.model.device))
             inputs_embeds = torch.cat([bos_embeds, graph_embeds[i].unsqueeze(0), inputs_embeds], dim=0)

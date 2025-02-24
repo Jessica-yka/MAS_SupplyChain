@@ -68,7 +68,8 @@ class SupplyChainGraphsDataset(Dataset):
         return {'train': train_indices, 'val': val_indices, 'test': test_indices}
 
 
-def preprocess():
+def preprocess(require_retrieve=True):
+
     os.makedirs(cached_desc, exist_ok=True)
     os.makedirs(cached_graph, exist_ok=True)
 
@@ -78,23 +79,27 @@ def preprocess():
         graph_idx = questions.iloc[index]['graph_idx']
         # if os.path.exists(f'{cached_graph}/{graph_idx}.pt'
         #     continue
-        
         graph = torch.load(f'{path_graphs}/{graph_idx}.pt')
         nodes = pd.read_csv(f'{path_nodes}/{graph_idx}.csv')
         edges = pd.read_csv(f'{path_edges}/{graph_idx}.csv')
-        subg, desc = retrieval_via_pcst(graph, q_embs[index], nodes, edges, topk=6, topk_e=6, cost_e=0.5)
+        if require_retrieve:
+            subg, desc = retrieval_via_pcst(graph, q_embs[index], nodes, edges, topk=10, topk_e=10, cost_e=0.5)
+        else:
+            subg = graph
+            desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
+
         torch.save(subg, f'{cached_graph}/{graph_idx}.pt')
         open(f'{cached_desc}/{index}.txt', 'w').write(desc)
 
 
 if __name__ == '__main__':
 
-    preprocess()
+    preprocess(require_retrieve=True)
     dataset = SupplyChainGraphsDataset()
 
-    data = dataset[0]
-    for k, v in data.items():
-        print(f'{k}: {v}')
+    # data = dataset[0]
+    # for k, v in data.items():
+    #     print(f'{k}: {v}')
 
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
