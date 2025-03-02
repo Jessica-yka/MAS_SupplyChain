@@ -1,5 +1,6 @@
-from model.utils.utils import get_state_description, get_demand_description
-from env import InventoryManagementEnv
+import sys
+from src.model.utils.utils import get_state_description, get_demand_description
+from src.model.env import InventoryManagementEnv
 
 task1_msg = (
     "Task1: Do you want to remove anyone from your upstream supplier list?\n"
@@ -61,28 +62,31 @@ def generate_msg(im_env: InventoryManagementEnv, shutdown_list: list, recovery_l
         f"Now this is the round {period}, "
         f"and you are {agent_name} at the stage {stage_id}: {im_env.stage_names[stage_id]} in the supply chain. "
         )
-    
-    for event in im_env.emergent_events[im_env.period]:
-        if event == "sudden_shutdown":
-            shutdown_agents = []
-            for (st_stage_id, st_agent_id) in shutdown_list:
-                shutdown_agents.append(f"stage_{st_stage_id}_agent_{st_agent_id}")
-            shutdown_agents = ", ".join(shutdown_agents)
-            shutdown_message = (
-                f"There is a sudden shutdown event. "
-                f"Those agent(s) are closed since now: {shutdown_agents}\n\n"
-            )
-            message += shutdown_message
-        if event == "recovery":
-            recovered_agents = []
-            for (rec_stage_id, rec_agent_id) in recovery_list:
-                recovered_agents.append(f"stage_{rec_stage_id}_agent_{rec_agent_id}")
-            recovered_agents = ", ".join(recovered_agents)
-            recover_message = (
-                f"There is a recovery event. "
-                f"Those agent(s) are re-open since now: {recovered_agents}\n\n"
-            )
-            message += recover_message
+    emergent_events = im_env.emergent_events.get(period, {'events': [], 'affected_agents': []})
+    for eid, event in enumerate(emergent_events['events']):
+        affected_agents = [f"stage_{sid}_agent_{aid}" for (sid, aid) in emergent_events['affected_agents'][eid]]
+        affected_agents = ", ".join(affected_agents)
+        message += f"An emergent event {event} has happened to {affected_agents}. "
+        # if event == "sudden_shutdown":
+        #     shutdown_agents = []
+        #     for (st_stage_id, st_agent_id) in shutdown_list:
+        #         shutdown_agents.append(f"stage_{st_stage_id}_agent_{st_agent_id}")
+        #     shutdown_agents = ", ".join(shutdown_agents)
+        #     shutdown_message = (
+        #         f"There is a sudden shutdown event. "
+        #         f"Those agent(s) are closed since now: {shutdown_agents}\n\n"
+        #     )
+        #     message += shutdown_message
+        # if event == "recovery":
+        #     recovered_agents = []
+        #     for (rec_stage_id, rec_agent_id) in recovery_list:
+        #         recovered_agents.append(f"stage_{rec_stage_id}_agent_{rec_agent_id}")
+        #     recovered_agents = ", ".join(recovered_agents)
+        #     recover_message = (
+        #         f"There is a recovery event. "
+        #         f"Those agent(s) are re-open since now: {recovered_agents}\n\n"
+        #     )
+        #     message += recover_message
     message += f"Given your current state:\n{get_state_description(state=stage_state, past_req_orders=past_req_orders, G=None, agent_name=agent_name, state_format=im_env.state_format, enable_graph_change=enable_graph_change)}\n\n"
     if stage_id != 0:
         down_order = []

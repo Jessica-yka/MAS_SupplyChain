@@ -6,11 +6,11 @@ import numpy as np
 from typing import List
 from tqdm.notebook import tqdm
 from autogen import ConversableAgent
-from llm_config import llm_config_list
+# sys.path.append('src')
+from src.model.llm_config import llm_config_list
 from src.model.utils.utils import extract_pairs
 from src.model.form_msg import generate_msg
-from src.model.utils.utils import visualize_state, save_string_to_file
-from src.model.utils.utils import update_sup_action
+from src.model.utils.utils import visualize_state, save_string_to_file, update_sup_action
 
 np.random.seed(0)
 
@@ -72,16 +72,17 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         action_sup_dict = {}
         action_dem_dict = {}
         total_chat_summary = ""
-        emergent_events = im_env.emergent_events[period]
-        for event in emergent_events:
-            if event == "demand_surge":
-                print("There is a sudden demand surge. ")
-                im_env.create_demand_surge()
-            if event == "sudden_shutdown":
-                print("There is a sudden shutdown event. ")
-                shutdown_list = im_env.shut_seq[period]
-                for stage_id, agent_id in shutdown_list:
-                    state_dict = im_env.create_shutdown_event(stage_id, agent_id, state_dict)
+        emergent_events = im_env.emergent_events.get(period, {'events': [], 'affected_agents': []})
+        for event in emergent_events['events']:
+            pass
+            # if event == "demand_surge":
+            #     print("There is a sudden demand surge. ")
+            #     im_env.create_demand_surge()
+            # if event == "sudden_shutdown":
+            #     print("There is a sudden shutdown event. ")
+            #     shutdown_list = im_env.shut_seq[period]
+            #     for stage_id, agent_id in shutdown_list:
+            #         state_dict = im_env.create_shutdown_event(stage_id, agent_id, state_dict)
                     
                 # while True:
                 #     print("Input the stage and agent id to close the company. Press enter to close the session.")
@@ -94,11 +95,11 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                 #     except ValueError:
                 #         print("The session is closed.")
                 #         break
-            if event == "recovery":
-                print("Here is a recovery event. ")
-                recovery_list = im_env.rec_seq[period]
-                for (stage_id, agent_id) in recovery_list:
-                    im_env.create_recovery_event(stage_id, agent_id)
+            # if event == "recovery":
+            #     print("Here is a recovery event. ")
+            #     recovery_list = im_env.rec_seq[period]
+            #     for (stage_id, agent_id) in recovery_list:
+            #         im_env.create_recovery_event(stage_id, agent_id)
                 # while True:
                 #     im_env.get_all_shutdown_agents()
                 #     print("Input the stage and agent id to re-open the compan(ies). Press enter to close the session.")

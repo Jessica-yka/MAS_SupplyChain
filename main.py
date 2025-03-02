@@ -12,20 +12,19 @@ from tqdm import tqdm
 from autogen import ConversableAgent
 # sys.path.append('src')
 from src.model.env import env_creator
-from src.model.config import env_configs, get_env_configs
+from src.model.config import env_configs_list, get_env_configs
 from src.model.llm_config import llm_config_list
 from openai import AzureOpenAI
-from model.gpt_mas_model import create_agents
-from model.gpt_mas_model import run_simulation
-from model.utils.utils import get_demand_description, get_state_description
-from model.utils.utils import clear_dir
+from src.model.gpt_mas_model import create_agents
+from src.model.gpt_mas_model import run_simulation
+from src.model.utils.utils import get_demand_description, get_state_description
+from src.model.utils.utils import clear_dir
 np.random.seed(42)
 
 # %%
 
 
 # %%
-config_list = llm_config_list
 
 
 # %% [markdown]
@@ -39,7 +38,7 @@ clear_dir(f"results/{env_config_name}")
 # create the dir to store the env setup
 os.makedirs(f"env/{env_config_name}", exist_ok=True)
 clear_dir(f"env/{env_config_name}")
-env_config = get_env_configs(env_configs=env_configs[env_config_name])
+env_config = get_env_configs(env_configs=env_configs_list[env_config_name])
 im_env = env_creator(env_config)
 
 # %% [markdown]
@@ -60,7 +59,7 @@ user_proxy = ConversableAgent(
 )
 
 # %%
-stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_per_stage"], llm_config={"config_list": config_list})
+stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_per_stage"], llm_config={"config_list": llm_config_list})
 
 # %%
 # for stage_agent in stage_agents:
@@ -74,7 +73,7 @@ stage_agents = create_agents(env_config["stage_names"], env_config["num_agents_p
 rewards = []
 for r in tqdm(range(1)):
     print("\n\nNew round starts")
-    stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list':config_list})
+    stage_agents = create_agents(stage_names=env_config["stage_names"], num_agents_per_stage=env_config['num_agents_per_stage'], llm_config={'config_list': llm_config_list})
     reward = run_simulation(im_env=im_env, user_proxy=user_proxy, stage_agents=stage_agents, config_name=env_config_name, round=r)
     rewards.append(reward)
     print(f"rewards = {reward}")

@@ -31,7 +31,7 @@ class LLM(torch.nn.Module):
         print('Loading LLAMA')
 
         kwargs = {
-            "max_memory": {0: '20GiB'},
+            "max_memory": {0: '20GiB', 1: '20GiB', 2: '20GiB', 3: '20GiB'},
             "device_map": "auto",
             "revision": "main",
         }
@@ -56,6 +56,9 @@ class LLM(torch.nn.Module):
             args.llm_model_path,
             quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
             device_map="auto",              # Automatically map the model to GPU(s)
+            torch_dtype=torch.float32,      # Use float32 for model weights
+            low_cpu_mem_usage=True,         # Use less CPU memory
+            max_memory=kwargs['max_memory'],  # Limit memory usage to 20GiB per GPU)
         )
 
 

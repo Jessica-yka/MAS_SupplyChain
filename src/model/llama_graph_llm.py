@@ -38,7 +38,7 @@ class GraphLLM(torch.nn.Module):
         #     "revision": "main",
         # }
         kwargs = {
-            "max_memory": {0: '20GiB'},
+            "max_memory": {0: '20GiB', 1: '20GiB', 2: '20GiB', 3: '20GiB'},
             "device_map": "auto",
             "revision": "main",
         }
@@ -61,6 +61,8 @@ class GraphLLM(torch.nn.Module):
             args.llm_model_path,
             quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
             device_map="auto",              # Automatically map the model to GPU(s)
+            max_memory=kwargs["max_memory"],  # Set the maximum memory for each device
+            revision=kwargs["revision"],  # Use the main revision of the model
         )
 
         if args.llm_frozen == 'True':
@@ -187,6 +189,7 @@ class GraphLLM(torch.nn.Module):
 
         return outputs.loss
 
+
     def inference(self, samples):
 
         # encode description and questions
@@ -238,6 +241,7 @@ class GraphLLM(torch.nn.Module):
                 'label': samples['label'],
                 'question': samples['question'],
                 'desc': samples['desc'], }
+
 
     def print_trainable_params(self):
         trainable_params = 0

@@ -3,7 +3,7 @@ import pandas as pd
 import torch
 from torch.utils.data import Dataset
 import sys
-sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
+sys.path.append('/data/yanjia/MAS_SupplyChain')
 from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
 import os
 from tqdm import tqdm
@@ -20,7 +20,7 @@ class SupplyChainGraphsDataset(Dataset):
     def __init__(self):
         super().__init__()
 
-        self.text = pd.read_csv(f'{PATH}/all_questions.csv')
+        self.text = pd.read_csv(f'{PATH}/all_train_questions.csv')
         # self.prompt = 'Question: Do argument 1 and argument 2 support or counter each other? Answer in one word in the form of \'support\' or \'counter\'.\n\nAnswer:'
         self.graph = None
         self.graph_type = 'Contextualized Supply Chain Graph'
@@ -68,13 +68,13 @@ class SupplyChainGraphsDataset(Dataset):
         return {'train': train_indices, 'val': val_indices, 'test': test_indices}
 
 
-def preprocess(require_retrieve=True):
+def preprocess(filename: str, require_retrieve: bool):
 
     os.makedirs(cached_desc, exist_ok=True)
     os.makedirs(cached_graph, exist_ok=True)
 
-    questions = pd.read_csv(f'{PATH}/all_questions.csv')
-    q_embs = torch.load(f'{PATH}/q_embs.pt')
+    questions = pd.read_csv(f'{PATH}/all_{filename}_questions.csv')
+    q_embs = torch.load(f'{PATH}/q_{filename}_embs.pt')
     for index in tqdm(range(len(questions))):
         graph_idx = questions.iloc[index]['graph_idx']
         # if os.path.exists(f'{cached_graph}/{graph_idx}.pt'
@@ -83,7 +83,7 @@ def preprocess(require_retrieve=True):
         nodes = pd.read_csv(f'{path_nodes}/{graph_idx}.csv')
         edges = pd.read_csv(f'{path_edges}/{graph_idx}.csv')
         if require_retrieve:
-            subg, desc = retrieval_via_pcst(graph, q_embs[index], nodes, edges, topk=10, topk_e=10, cost_e=0.5)
+            subg, desc = retrieval_via_pcst(graph, q_embs[index], nodes, edges, topk=12, topk_e=12, cost_e=0.5)
         else:
             subg = graph
             desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
@@ -94,7 +94,7 @@ def preprocess(require_retrieve=True):
 
 if __name__ == '__main__':
 
-    preprocess(require_retrieve=True)
+    preprocess(filename='train', require_retrieve=False)
     dataset = SupplyChainGraphsDataset()
 
     # data = dataset[0]

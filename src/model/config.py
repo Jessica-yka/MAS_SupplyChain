@@ -2,6 +2,8 @@
 Environment Configurations
 """
 import numpy as np
+import sys
+sys.path.append('/data/yanjia/MAS_SupplyChain')
 from src.model.data_simulation import generate_lead_time, generate_prod_capacity
 from src.model.data_simulation import generate_cost_price, generate_sup_dem_relations
 from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
@@ -16,28 +18,28 @@ env_configs_list = {
     "large_graph_test": {
         "config_name": "large_graph_test",
         "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 3,
-        "num_init_customers": 3,
-        "num_agents_per_stage": 20, # >= 2
-        "num_periods": 20,
+        "num_init_suppliers": 2,
+        "num_init_customers": 2,
+        "num_agents_per_stage": 10, # >= 2
+        "num_periods": 15,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
-        "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 2, 8), # constant/uniform
-        "prod_capacity_dist": ("uniform", 25, 40), # constant/uniform
-        "demand_fn": {"dist": "constant_demand", "mean": 5, "trend": "linear"}, # constant/functional
+        "init_inventory_dist": {'dist': "uniform", 'lb': 10, 'ub': 15}, # constant/uniform/etc
+        "price_cost_dist": {'dist': 'uniform', 'lb': 1, 'ub': 8}, # constant/uniform/normal/etc
+        "lead_time_dist": {'dist': 'uniform', 'lb': 2, 'ub': 15}, # constant/uniform
+        "prod_capacity_dist": {'dist': 'uniform', 'lb': 25, 'ub': 40}, # constant/uniform("uniform", 25, 40)
+        "demand_fn": {"dist": "constant_demand", "mean": 5, "trend": "linear", 'with_noise': True}, # constant/functional
         "holding_costs_dist": {"dist": "constant", "mean": 10}, 
-        "backlog_costs_dist": "constant", 
-        "profit_rate_dist": ("uniform", 0, 1), 
+        "backlog_costs_dist": {'dist': "constant", "mean": 5}, 
+        "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 
         "llm_agents": [(1, 1)],
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
         "env_no_backlog": True, 
-        "emergent_events": [], 
-        "shut_seq": {},
-        "rec_seq": {},
+        "emergent_events": {0: {"events": ["earthquake"], 'affected_agents': [[(2, 10)]]},
+                            }, 
+
     },
     "large_graph_test_ee": {
         "config_name": "large_graph_test",
@@ -60,45 +62,24 @@ env_configs_list = {
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
-        "emergent_events": [(5, "sudden_shutdown"), (7, "recovery")], 
-        "shut_seq": {5: [(2, 2), (2, 10), (2, 13)]},
-        "rec_seq": {7: [(2,2), (2,10)]},
-    },
-    "large_graph_normal_demand_test": {
-        "config_name": "large_graph_test",
-        "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 3,
-        "num_init_customers": 3,
-        "num_agents_per_stage": 20, # >= 2
-        "num_periods": 8,
-        "num_stages": 4,
-        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
-        "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
-        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
-        "demand_fn": {"dist": "normal_demand", "mean": 10, "std": 3, "trend": False}, # constant/functional
-        "holding_costs_dist": "constant", 
-        "backlog_costs_dist": "constant", 
-        "profit_rate_dist": ("uniform", 0, 1), 
-        "llm_agents": [(0, 1)],
-        "enable_graph_change": True, 
-        "state_format": "base", 
+        "emergent_events": {}, 
+
     },
 }
 
 def get_env_configs(env_configs: dict):
 
-    env_config_name = env_configs_list['config_name']
+    env_config_name = env_configs['config_name']
     # create the dir to store the results
-    os.makedirs(f"../../results/{env_config_name}", exist_ok=True)
-    clear_dir(f"../../results/{env_config_name}")
+
+    os.makedirs(f"results/{env_config_name}", exist_ok=True)
+    clear_dir(f"results/{env_config_name}")
     # crate the dir to store the env setup
-    os.makedirs(f"../../env/{env_config_name}", exist_ok=True)
-    clear_dir(f"../../env/{env_config_name}")
+    os.makedirs(f"env/{env_config_name}", exist_ok=True)
+    clear_dir(f"env/{env_config_name}")
     
 
-    save_dict_to_json(data=env_configs, save_path=f"../../env/{env_config_name}/config.json")
+    save_dict_to_json(data=env_configs, save_path=f"env/{env_config_name}/config.json")
     num_stages = env_configs["num_stages"]
     num_agents_per_stage = env_configs["num_agents_per_stage"]
     num_periods = env_configs["num_periods"]
@@ -125,8 +106,7 @@ def get_env_configs(env_configs: dict):
     # profit_rates = \
     #     generate_profit_rates(dist=env_configs["profit_rate_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     
-    demand_fn = Demand_fn(dist=env_configs["demand_fn"]['dist'], mean=env_configs["demand_fn"].get("mean", 0), std=env_configs["demand_fn"].get("std", 0), 
-                          lb=env_configs["demand_fn"].get("lb", 0), ub=env_configs["demand_fn"].get("ub", 0), trend=env_configs["demand_fn"].get("trend", False))
+    demand_fn = Demand_fn(dist=env_configs["demand_fn"])
     stage_names = env_configs["stage_names"]
     llm_agents = env_configs["llm_agents"]
     state_format = env_configs["state_format"]
@@ -134,11 +114,8 @@ def get_env_configs(env_configs: dict):
     
     enable_graph_change = env_configs["enable_graph_change"]
     enable_price_change = env_configs["enable_price_change"]
-    emergent_events = defaultdict(list)
-    for (t, ee) in env_configs["emergent_events"]:
-        emergent_events[t].append(ee)
-    shut_seq = env_configs["shut_seq"]
-    rec_seq = env_configs["rec_seq"]
+    emergent_events = env_configs["emergent_events"]
+
 
     return {
         'num_stages': num_stages,
@@ -164,8 +141,6 @@ def get_env_configs(env_configs: dict):
         "enable_graph_change": enable_graph_change,
         "enable_price_change": enable_price_change, 
         "emergent_events": emergent_events,
-        "shut_seq": shut_seq,
-        "rec_seq": rec_seq,  
     }
     
 

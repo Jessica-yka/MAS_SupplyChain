@@ -1,80 +1,73 @@
 import numpy as np
 import os
 import re
+import sys
+sys.path.append('/data/yanjia/MAS_SupplyChain')
 from src.model.utils.utils import save_array, extract_pairs
 from src.model.utils.utils import random_relations
+from random import random
 
-def generate_lead_time(dist: tuple, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
-    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
-    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
-    
+def generate_lead_time(dist: dict, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
     # To generate lead time for each agent
-    if dist[0] == 'uniform':
-        data = np.random.uniform(low=dist[1], high=dist[2], size=(num_stages, num_agents_per_stage, num_agents_per_stage)).astype(int)
-    elif dist[0] == "constant":
-        mean = dist[1]
+    if dist['dist'] == 'uniform':
+        data = np.random.uniform(low=dist['lb'], high=dist['ub'], size=(num_stages, num_agents_per_stage, num_agents_per_stage)).astype(int)
+    elif dist['dist'] == "constant":
+        mean = dist['mean']
         data = [mean for _ in range(num_stages * num_agents_per_stage * num_agents_per_stage)]
         data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage).astype(int)
     else:
         raise AssertionError("Lead time function is not implemented.")
 
     if save_data:
-        save_array(data, f"../../env/{config_name}/lead_time.npy")
+        save_array(data, f"env/{config_name}/lead_time.npy")
 
     return data
 
-def generate_prod_capacity(dist: tuple, num_data: int, config_name: str="test", save_data: bool=True):
+def generate_prod_capacity(dist: dict, num_data: int, config_name: str="test", save_data: bool=True):
     # To generate production capacity for each agent
-    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
-    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
-    
-    if dist[0] == 'uniform':
-        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data).astype(int)
-    elif dist[0] == 'constant':
-        data = np.array([dist[1] for _ in range(num_data)]).astype(int)
+    if dist['dist'] == 'uniform':
+        data = np.random.uniform(low=dist['lb'], high=dist['ub'], size=num_data).astype(int)
+    elif dist['dist'] == 'constant':
+        data = np.array([dist['mean'] for _ in range(num_data)]).astype(int)
     else:
         raise AssertionError("Prod capacity function is not implemented.")
     
     if save_data:
-        save_array(data, f"../../env/{config_name}/prod_capacity.npy")
+        save_array(data, f"env/{config_name}/prod_capacity.npy")
     return data
 
 
-def generate_profit_rates(dist: tuple, num_data: int, config_name: str="test", save_data: bool=True):
+def generate_profit_rates(dist: dict, num_data: int, config_name: str="test", save_data: bool=True):
     # To generate profit rate for agents to decide price based on cost
-    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
-    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
-
-    if dist[0] == "uniform":
-        data = 1 + np.random.uniform(low=dist[1], high=dist[2], size=num_data)
-    elif dist[0] == 'constant':
-        mean = 1 + dist[1]
+    if dist['dist'] == "uniform":
+        data = 1 + np.random.uniform(low=dist['lb'], high=dist['ub'], size=num_data)
+    elif dist['dist'] == 'constant':
+        mean = 1 + dist['mean']
         data = np.array([mean for _ in range(num_data)])
     else:
         raise AssertionError("Profit rate function is not implemented.")
 
     if save_data:
-        save_array(data, f"../../env/{config_name}/profit_rate.npy")
+        save_array(data, f"env/{config_name}/profit_rate.npy")
     return data
 
-def generate_prod_cost(dist: str, num_data: int, lb=5, ub=15, config_name: str="test", save_data: bool=True):
+def generate_prod_cost(dist: dict, num_data: int, lb=5, ub=15, config_name: str="test", save_data: bool=True):
 
-    if dist == "uniform":
-        data = np.random.uniform(low=lb, high=ub, size=num_data)
-    elif dist == "constant":
-        mean = (lb + ub)//2
+    if dist['dist'] == "uniform":
+        data = np.random.uniform(low=dist['lb'], high=dist['ub'], size=num_data)
+    elif dist['dist'] == "constant":
+        mean = dist['mean']
         data = np.array([mean for _ in range(num_data)])
     else:
         raise AssertionError("Prod cost function is not implemented.")
     data = data.astype(int)
 
     if save_data:
-        save_array(data, f"../../env/{config_name}/prod_cost.npy")
+        save_array(data, f"env/{config_name}/prod_cost.npy")
     return data
 
-def generate_cost_price(prod_cost_dist: str, profit_rate_dist: tuple, num_stages: int, num_agents_per_stage: int, 
+def generate_cost_price(prod_cost_dist: dict, profit_rate_dist: dict, num_stages: int, num_agents_per_stage: int, 
                         config_name: str="test", save_data: bool=True):
-
     # price = total cost * profit rate
     # cost = order cost + production cost
     num_total_agents = num_stages * num_agents_per_stage
@@ -100,8 +93,8 @@ def generate_cost_price(prod_cost_dist: str, profit_rate_dist: tuple, num_stages
     all_order_costs = np.array(all_order_costs).astype(int)
 
     if save_data:
-        save_array(all_sale_prices, f"../../env/{config_name}/sale_prices.npy")
-        save_array(all_order_costs, f"../../env/{config_name}/order_costs.npy")
+        save_array(all_sale_prices, f"env/{config_name}/sale_prices.npy")
+        save_array(all_order_costs, f"env/{config_name}/order_costs.npy")
     return all_order_costs, all_sale_prices, all_prod_costs
 
 
@@ -154,80 +147,100 @@ def generate_holding_costs(dist: dict, num_data: int, config_name: str="test", s
         raise AssertionError("holding function is not implemented.")
 
     if save_data:
-        save_array(data, f"../../env/{config_name}/holding_costs.npy")
+        save_array(data, f"env/{config_name}/holding_costs.npy")
     return data
 
 
-def generate_backlog_costs(dist: str, num_data: int, lb: int=1, ub: int=5, config_name: str="test", save_data: bool=True):
-
-    if dist == 'constant':
-        mean = (lb + ub)//2
+def generate_backlog_costs(dist: dict, num_data: int, lb: int=1, ub: int=5, config_name: str="test", save_data: bool=True):
+    if dist['dist'] == 'constant':
+        mean = dist['mean']
         data = np.array([mean for _ in range(num_data)])
-    elif dist == "uniform":
-        data = np.random.uniform(low=lb, high=ub, size=num_data)
+    elif dist['dist'] == "uniform":
+        data = np.random.uniform(low=dist['lb'], high=dist['ub'], size=num_data)
     else:
         raise AssertionError("backlog function is not implemented.")
     
     if save_data:
-        save_array(data, f"../../env/{config_name}/backlog_costs.npy")
+        save_array(data, f"env/{config_name}/backlog_costs.npy")
+    return data
+
+
+def generate_backlogs(dist: dict, num_data: int, config_name: str="test", save_data: bool=False):
+    
+    if dist['dist'] == 'constant':
+        mean = dist['mean']
+        data = np.array([mean for _ in range(num_data)])
+    elif dist['dist'] == 'uniform':
+        lb = dist['lb']
+        ub = dist['ub']
+        data = np.random.uniform(low=lb, high=ub, size=num_data)
+    else:
+        raise AssertionError("backlog function is not implemented.")
+    
+    data = data.astype(int)
+    if save_data:
+        save_array(data, f"env/{config_name}/backlogs.npy")
     return data
     
 
-def generate_init_inventories(dist: tuple, num_data: int, config_name: str="test", save_data: bool=True):
-    assert len(dist) == 3 if dist[0] == 'uniform' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
-    assert len(dist) == 2 if dist[0] == 'constant' else 1, "Please provide the mean value for the constant distribution."
+def generate_init_inventories(dist: dict, num_data: int, config_name: str="test", save_data: bool=True):
     
-    if dist[0] == "constant":
-        mean = dist[1]
+    if dist['dist'] == "constant":
+        mean = dist['mean']
         data = np.array([mean for _ in range(num_data)]).astype(int)
-    elif dist[0] == 'uniform':
-        data = np.random.uniform(low=dist[1], high=dist[2], size=num_data).astype(int)
+    elif dist['dist'] == 'uniform':
+        data = np.random.uniform(low=dist['lb'], high=dist['ub'], size=num_data).astype(int)
     else:
         raise AssertionError("init inventories is not implemented")
     
     if save_data:
-        save_array(data, f"../../env/{config_name}/init_inventories.npy")
+        save_array(data, f"env/{config_name}/init_inventories.npy")
     return data
 
 class Demand_fn:
 
-    def __init__(self, dist: str, trend: str, epsilon: int=None, mean: int=None, lb: int=None, ub: int=None, std: int=None):
+    def __init__(self, dist: dict):
         # assert len(dist) == 3 if dist[0] == 'normal_demand' else 1, "Please provide the mean and std for the normal distribution."
         # assert len(dist) == 3 if dist[0] == 'uniform_demand' else 1, "Please provide the lower bound and upper bound for the uniform distribution."
         # assert len(dist) == 2 if dist[0] == 'constant_demand' else 1, "Please provide the mean value for the constant distribution."
         # assert len(dist) == 2 if "poisson_demand" in dist[0] else 1, "Please provide the mean value for the poisson distribution."
         
-        self.lb = lb
-        self.ub = ub
-        self.mean = mean
-        self.std = std
-        self.dist = dist
-        self.epsilon = epsilon
+        self.lb = dist.get('lb', None)
+        self.ub = dist.get('ub', None)
+        self.mean = dist.get('mean', None)
+        self.std = dist.get('std', None)
+        self.dist = dist['dist']
         self.period = -1
 
+        # Whether there is a random noise on demand
+        if dist['with_noise']:
+            self.noise = lambda x: np.random.poisson(lam=3)
+        else: # poisson distribution of noise
+            self.noise = lambda x: 0
+
         # There is a trend along time
-        if trend == "":
+        if dist['trend'] == "":
             self.trend = lambda t: 0 
-        elif trend == "linear":
+        elif dist['trend'] == "linear":
             self.trend = lambda t: 2 * (t//2) 
         else: # TO-DO: other forms of trend
             raise ValueError("Trend function is not implemented")
  
 
     def constant_demand(self):
-        return self.mean + self.trend(self.period)
+        return self.mean + self.trend(self.period) + self.noise(self.period)
 
     def uniform_demand(self):
-        return np.random.randint(low=self.lb, high=self.ub) + self.trend(self.period)
+        return np.random.randint(low=self.lb, high=self.ub) + self.trend(self.period) + self.noise(self.period)
     
     def normal_demand(self):
-        return np.random.normal(self.mean, self.std) + self.trend(self.period)
+        return np.random.normal(self.mean, self.std) + self.trend(self.period) + self.noise(self.period)
     
     def poisson_demand(self):
-        return np.random.poisson(self.mean) + self.trend(self.period)
+        return np.random.poisson(self.mean) + self.trend(self.period) + self.noise(self.period)
     
     def seasonal_demand(self):
-        return 3 * np.sin(2 * np.pi * 0.2 * self.period) + 5 + self.trend(self.period)
+        return 3 * np.sin(2 * np.pi * 0.2 * self.period) + 5 + self.trend(self.period) + self.noise(self.period)
     
         
     def __call__(self, t):

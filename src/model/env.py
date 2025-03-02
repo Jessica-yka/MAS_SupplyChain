@@ -10,10 +10,11 @@ from typing import Callable
 import numpy as np
 from gymnasium import spaces
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
-
-from config import env_configs, get_env_configs
-from model.utils.utils import visualize_state, parse_stage_agent_id, clear_dir
-from data_simulation import generate_sup_dem_relations
+import sys
+sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
+from src.model.config import env_configs_list, get_env_configs
+from src.model.utils.utils import visualize_state, parse_stage_agent_id, clear_dir
+from src.model.data_simulation import generate_sup_dem_relations
 import os
 import copy
 # from sc_graph import create_agent_profiles, SupplyChain_Graph
@@ -51,7 +52,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
         prod_capacities: list, sale_prices: np.array, order_costs: np.array, prod_costs: np.array, backlog_costs: np.array, holding_costs: np.array, state_format: str, 
         supply_relations: dict, demand_relations: dict, stage_names: list, agent_profiles: list, enable_graph_change: bool, 
-        enable_price_change: bool, emergent_events: dict, shut_seq: dict, rec_seq: dict, sc_graph=None, llm_agents: list=None, init_seed: int = 0):
+        enable_price_change: bool, emergent_events: dict, env_no_backlog: bool=True, sc_graph=None, llm_agents: list=None, init_seed: int = 0):
         """
         Initialize the inventory management environment
 
@@ -124,8 +125,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.enable_graph_change = enable_graph_change
         self.enable_price_change = enable_price_change
         self.emergent_events = emergent_events
-        self.shut_seq = shut_seq
-        self.rec_seq = rec_seq
+
 
         # Create all variables
         self.period = 0
@@ -139,6 +139,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.total_profits = np.zeros(self.num_periods + 1, dtype=int)
         self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage))
         self.shutdown_agents_set = set()
+        self.env_no_backlog = env_no_backlog
 
         # Compute the upper bounds for state variables
         max_production = self.max_production
@@ -212,8 +213,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         if self.env_no_backlog:
             for m in range(self.num_stages):
                 for x in range(self.num_agents_per_stage):
-                    if not ((m, x) in self.llm_agents):
-                        self.inventories[m*num_agents_per_stage+x] = int(1e5)
+                    if not ((m, x) in self.llm_agent_set):
+                        self.inventories[m, x, 0] = int(1e5)
                         
         self.supply_relations = copy.deepcopy(self.init_supply_relations)
         self.demand_relations = copy.deepcopy(self.init_demand_relations)
@@ -539,11 +540,10 @@ def env_creator(env_config):
         stage_names=env_config['stage_names'],
         llm_agents=env_config['llm_agents'],
         state_format=env_config['state_format'],
+        env_no_backlog=env_config['env_no_backlog'],
         enable_graph_change=env_config["enable_graph_change"], 
         enable_price_change=env_config["enable_price_change"], 
         emergent_events=env_config["emergent_events"], 
-        shut_seq=env_config["shut_seq"],
-        rec_seq=env_config["rec_seq"],  
         agent_profiles=agent_profiles,
         sc_graph = sc_graph,
     )
@@ -558,7 +558,7 @@ if __name__ == '__main__':
     # create the dir to store the env setup
     os.makedirs(f"env/{config_name}", exist_ok=True)
     clear_dir(f"env/{config_name}")
-    ec = get_env_configs(env_configs[config_name])
+    ec = get_env_configs(env_configs_list[config_name])
     im_env = env_creator(env_config=ec)
     im_env.reset()
     
@@ -579,8 +579,8 @@ if __name__ == '__main__':
         print(f"period = {t}")
         sup_dict = {}
         dem_dict = {}
-        supply_relations, demand_relations = generate_sup_dem_relations(type=env_configs[config_name]["sup_dem_relation_type"], \
-                                                                        num_customers=env_configs[config_name]["num_init_customers"], num_suppliers=env_configs[config_name]["num_init_suppliers"], \
+        supply_relations, demand_relations = generate_sup_dem_relations(type=env_configs_list[config_name]["sup_dem_relation_type"], \
+                                                                        num_customers=env_configs_list[config_name]["num_init_customers"], num_suppliers=env_configs[config_name]["num_init_suppliers"], \
                                                                         num_stages=im_env.num_stages, num_agents_per_stage=im_env.num_agents_per_stage)
         for m in range(im_env.num_stages):
             for x in range(im_env.num_agents_per_stage):

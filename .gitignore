@@ -158,13 +158,18 @@ cython_debug/
 .idea/
 
 # Project
+results/output
 results/
+output/
 runs/
 notebooks/
 draft.ipynb
 src/KDD-Tutorial-2-Let-Your-Graph-Do-The-Talking.ipynb
 src/gnn/useless_old_trash
 src/gnn/data_generation.ipynb
+download_model.py
+*.log
+*.csv
 
 wandb/
 src/gnn/gnn_dataset
@@ -174,7 +179,6 @@ src/gnn/gnn_dataset
 src/model/llm_config.py
 
 .DS_Store
-output
 
 # conda env
 uist2025/
