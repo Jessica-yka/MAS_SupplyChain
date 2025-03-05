@@ -17,10 +17,10 @@ cached_graph = f'{PATH}/cached_graphs'
 cached_desc = f'{PATH}/cached_desc'
 
 class SupplyChainGraphsDataset(Dataset):
-    def __init__(self):
+    def __init__(self, dataset='all_train_questions.csv'):
         super().__init__()
 
-        self.text = pd.read_csv(f'{PATH}/all_train_questions.csv')
+        self.text = pd.read_csv(f'{PATH}/{dataset}')
         # self.prompt = 'Question: Do argument 1 and argument 2 support or counter each other? Answer in one word in the form of \'support\' or \'counter\'.\n\nAnswer:'
         self.graph = None
         self.graph_type = 'Contextualized Supply Chain Graph'
@@ -30,11 +30,12 @@ class SupplyChainGraphsDataset(Dataset):
         return len(self.text)
 
     def __getitem__(self, index):
-
-        question = self.text.loc[index, 'question']
-        label = self.text.loc[index, 'label']
-        graph_idx = int(self.text.loc[index, 'graph_idx'])
-
+        try:
+            question = self.text.loc[index, 'question']
+            label = self.text.loc[index, 'label']
+            data_index = int(self.text.loc[index, 'graph_idx'])
+        except KeyError:
+            return 
         
         # nodes = pd.read_csv(f'{PATH}/nodes/{graph_idx}.csv')
         # edges = pd.read_csv(f'{PATH}/edges/{graph_idx}.csv')
@@ -42,11 +43,11 @@ class SupplyChainGraphsDataset(Dataset):
         # graph = torch.load(f'{PATH}/graphs/{graph_idx}.pt')        
         # desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
 
-        graph = torch.load(f'{cached_graph}/{graph_idx}.pt')
-        desc = open(f'{cached_desc}/{index}.txt', 'r').read()
+        graph = torch.load(f'{cached_graph}/{data_index}.pt')
+        desc = open(f'{cached_desc}/{data_index}.txt', 'r').read()
 
         return {
-            'id': index,
+            'id': data_index,
             'label': label,
             'desc': desc,
             'graph': graph,
@@ -76,20 +77,20 @@ def preprocess(filename: str, require_retrieve: bool):
     questions = pd.read_csv(f'{PATH}/all_{filename}_questions.csv')
     q_embs = torch.load(f'{PATH}/q_{filename}_embs.pt')
     for index in tqdm(range(len(questions))):
-        graph_idx = questions.iloc[index]['graph_idx']
+        data_idx = questions.iloc[index]['graph_idx']
         # if os.path.exists(f'{cached_graph}/{graph_idx}.pt'
         #     continue
-        graph = torch.load(f'{path_graphs}/{graph_idx}.pt')
-        nodes = pd.read_csv(f'{path_nodes}/{graph_idx}.csv')
-        edges = pd.read_csv(f'{path_edges}/{graph_idx}.csv')
+        graph = torch.load(f'{path_graphs}/{data_idx}.pt')
+        nodes = pd.read_csv(f'{path_nodes}/{data_idx}.csv')
+        edges = pd.read_csv(f'{path_edges}/{data_idx}.csv')
         if require_retrieve:
-            subg, desc = retrieval_via_pcst(graph, q_embs[index], nodes, edges, topk=12, topk_e=12, cost_e=0.5)
+            subg, desc = retrieval_via_pcst(graph, q_embs[data_idx], nodes, edges, topk=12, topk_e=12, cost_e=0.5)
         else:
             subg = graph
             desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
 
-        torch.save(subg, f'{cached_graph}/{graph_idx}.pt')
-        open(f'{cached_desc}/{index}.txt', 'w').write(desc)
+        torch.save(subg, f'{cached_graph}/{data_idx}.pt')
+        open(f'{cached_desc}/{data_idx}.txt', 'w').write(desc)
 
 
 if __name__ == '__main__':

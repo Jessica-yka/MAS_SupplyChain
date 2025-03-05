@@ -52,13 +52,13 @@ def generate_text_embedding(path: str):
     # _encode_graph()
 
     df_train = pd.read_csv(f'{path}/all_train_questions.csv')
-    df_test = pd.read_csv(f'{path}/all_test_questions.csv')
+    # df_test = pd.read_csv(f'{path}/all_test_questions.csv')
     os.makedirs(f'{path}/graphs/', exist_ok=True)
     model, tokenizer, device = load_model[model_name]()
     text2embedding = load_text2embedding[model_name]
 
     _encode_questions(df=df_train, filename='train')
-    _encode_questions(df=df_test, filename='test')
+    # _encode_questions(df=df_test, filename='test')
     _encode_graph()
 
 

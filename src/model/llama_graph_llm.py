@@ -160,6 +160,9 @@ class GraphLLM(torch.nn.Module):
             label_input_ids = labels.input_ids[i][:self.max_new_tokens] + eos_tokens.input_ids
             input_ids = descriptions.input_ids[i][:self.max_txt_len] + questions.input_ids[i] + eos_user_tokens.input_ids + label_input_ids # description length is roughly 500~1200
             inputs_embeds = self.word_embedding(torch.tensor(input_ids).to(self.model.device))
+            # print("shape of bos_embeds", bos_embeds.shape)
+            # print("shape of graph_embeds[i]", graph_embeds[i].shape)
+            # print("shape of inputs_embeds", inputs_embeds.shape)
             inputs_embeds = torch.cat([bos_embeds, graph_embeds[i].unsqueeze(0), inputs_embeds], dim=0)
 
             batch_inputs_embeds.append(inputs_embeds)
@@ -181,12 +184,17 @@ class GraphLLM(torch.nn.Module):
 
         with self.maybe_autocast():
             outputs = self.model(
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                return_dict=True,
-                labels=label_input_ids,
+            inputs_embeds=inputs_embeds,
+            attention_mask=attention_mask,
+            return_dict=True,
+            labels=label_input_ids,
             )
-
+        
+        # # Print the size of the vocabulary
+        # vocab_size = len(self.tokenizer.get_vocab())
+        # print("Vocabulary size:", vocab_size)
+        # print("input sequence size", inputs_embeds.shape)
+        # exit()
         return outputs.loss
 
 

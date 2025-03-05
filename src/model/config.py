@@ -18,9 +18,9 @@ env_configs_list = {
     "large_graph_test": {
         "config_name": "large_graph_test",
         "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 2,
-        "num_init_customers": 2,
-        "num_agents_per_stage": 10, # >= 2
+        "num_init_suppliers": 1,
+        "num_init_customers": 1,
+        "num_agents_per_stage": 4, # >= 2
         "num_periods": 15,
         "num_stages": 4,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
