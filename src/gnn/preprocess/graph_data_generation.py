@@ -16,7 +16,7 @@ import os
 import re
 import sys
 import time
-sys.path.append('/data/yanjia/MAS_SupplyChain')
+sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.model.config import env_configs_list
 from src.model.utils.utils import clear_dir, split_demand, save_data_to_json, read_data_from_json
@@ -437,7 +437,7 @@ def get_event_sub_df_edges(G: nx.DiGraph, df_nodes: pd.DataFrame, df_edges: pd.D
         if related_nodes.get(src_name, 0) and related_nodes.get(dst_name, 0):
             df_simp_edges.loc[row_idx] = [node_name_id_map[src_name], data['label'], node_name_id_map[dst_name], src_name, dst_name]
             row_idx += 1
-       
+
     # add lead time info to the edge_df
     # _, stage_id, _, agent_id = target_node.split('_')
     # stage_id = int(stage_id)
@@ -450,8 +450,7 @@ def get_event_sub_df_edges(G: nx.DiGraph, df_nodes: pd.DataFrame, df_edges: pd.D
     #                                       f"has lead time of {lt} days to", node_name_id_map[target_node], 
     #                                       f"stage_{stage_id+1}_agent_{i}", target_node]
     #         row_idx += 1
-    
-    df_events = df_edges['affects' in df_edges['label']].reset_index(drop=True)
+    df_events = df_edges[df_edges['label'].str.contains('affects')].reset_index(drop=True)
     for i in range(len(df_events)):
         df_simp_edges.loc[row_idx] = [node_name_id_map[df_events.loc[i, 'source']], df_events.loc[i, 'label'], node_name_id_map[df_events.loc[i, 'target']], df_events.loc[i, 'source'], df_events.loc[i, 'target']]
         row_idx += 1
@@ -920,6 +919,7 @@ if __name__ == "__main__":
         G = build_supplier_graph(df_edges=df_edges, df_nodes=df_nodes)
         
         if create_event_questions:
+            # print("generate event questions")
             questions, answers = generate_event_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
             df_event_qa = pd.concat([df_event_qa, pd.DataFrame({"question": questions, 
                                                     "label": answers, 
@@ -927,6 +927,7 @@ if __name__ == "__main__":
         data_idx += num_questions_per_graph
 
         if create_price_questions:
+            # print("generate price questions")
             questions, answers = generate_price_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
             df_price_qa = pd.concat([df_price_qa, pd.DataFrame({"question": questions, 
                                                     "label": answers, 
@@ -934,14 +935,16 @@ if __name__ == "__main__":
         data_idx += num_questions_per_graph
 
         if create_lead_time_questions:
+            # print("generate lead time questions")
             questions, answers = generate_lead_time_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
             df_lead_time_qa = pd.concat([df_lead_time_qa, pd.DataFrame({"question": questions, 
                                                     "label": answers, 
                                                     'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
         data_idx += num_questions_per_graph
         if create_supplier_questions:
+            # print("generate supplier questions")
             questions, answers = generate_supplier_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
-            df_lead_time_qa = pd.concat([df_suppliers_qa, pd.DataFrame({"question": questions,
+            df_suppliers_qa = pd.concat([df_suppliers_qa, pd.DataFrame({"question": questions,
                                                     "label": answers,
                                                     'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
         data_idx += num_questions_per_graph
@@ -960,8 +963,8 @@ if __name__ == "__main__":
         df_lead_time_qa.to_csv(f"{save_path}/{env_config_name}/all_lead_time_questions.csv", index=False)
     
     if create_supplier_questions:
-        df_lead_time_qa['graph_idx'] = df_lead_time_qa['graph_idx'].astype(int)
-        df_lead_time_qa.to_csv(f"{save_path}/{env_config_name}/all_supplier_questions.csv", index=False)
+        df_suppliers_qa['graph_idx'] = df_suppliers_qa['graph_idx'].astype(int)
+        df_suppliers_qa.to_csv(f"{save_path}/{env_config_name}/all_supplier_questions.csv", index=False)
 
     # generate test questions
     # df_est_demand_qa = pd.DataFrame({"question": [], "label": []})

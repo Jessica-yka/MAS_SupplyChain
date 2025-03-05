@@ -7,7 +7,7 @@ import sys
 from tqdm import tqdm
 from torch_geometric.data.data import Data
 import sys
-sys.path.append('/data/yanjia/MAS_SupplyChain')
+# sys.path.append('/data/yanjia/MAS_SupplyChain')
 from src.gnn.preprocess.generate_split import generate_split
 from src.gnn.preprocess.lm_modeling import load_model, load_text2embedding
 
