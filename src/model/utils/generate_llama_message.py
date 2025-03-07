@@ -4,13 +4,13 @@ import networkx as nx
 import pandas as pd
 
 
-upstream_reliability_msg = lambda stage_id: (
-    f"Task: Which upstream compan(ies) at stage{stage_id} has high reliability, in terms of production capacity, delivery time, order fullfillment, and price? "
-    "Provide the answer in brackets (e.g., [stage_x_agent_y])."
-)
-demand_msg = (
-    "Task: What is your estimated demand from downstream in the next round? Provide the answer in brackets (e.g., [10]). \n"
-)
+# upstream_reliability_msg = lambda stage_id: (
+#     f"Task: Which upstream compan(ies) at stage{stage_id} has high reliability, in terms of production capacity, delivery time, order fullfillment, and price? "
+#     "Provide the answer in brackets (e.g., [stage_x_agent_y])."
+# )
+# demand_msg = (
+#     "Task: What is your estimated demand from downstream in the next round? Provide the answer in brackets (e.g., [10]). \n"
+# )
 event_upstream_price_msg = lambda event, stage: (
     f"Task: Based on the provided supply chain graph, how would the {event} affect any of your upstream suppliers reliability in terms of price? Answer either positive or negative if it happens to your supplier(s), otherwise answer 'neutral'\n"
     "Please state your reason in 1-2 sentences."

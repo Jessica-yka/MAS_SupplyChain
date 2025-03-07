@@ -23,7 +23,8 @@ def parse_args_llama():
     parser.add_argument("--seed", type=int, default=0)
 
     parser.add_argument("--dataset", type=str, default='supplychain_graphs')
-    parser.add_argument("--lr", type=float, default=1e-8) # 1e-5
+    parser.add_argument("--env_config", type=str, default='large_graph_test')
+    parser.add_argument("--lr", type=float, default=1e-6) # 1e-5
     parser.add_argument("--wd", type=float, default=0.05)
     parser.add_argument("--patience", type=float, default=2)
 
@@ -33,7 +34,7 @@ def parse_args_llama():
     parser.add_argument("--skip_training", action='store_true')
 
     # Learning Rate Scheduler
-    parser.add_argument("--num_epochs", type=int, default=10)
+    parser.add_argument("--num_epochs", type=int, default=20)
     parser.add_argument("--warmup_epochs", type=float, default=1)
 
     # Inference

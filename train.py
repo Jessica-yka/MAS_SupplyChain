@@ -29,16 +29,30 @@ def main(args):
     seed_everything(seed=args.seed)
     print(args)
 
-    dataset = load_dataset[args.dataset](dataset='all_train_questions.csv')
-    idx_split = dataset.get_idx_split()
+    # dataset = load_dataset[args.dataset](dataset='all_train_questions.csv')
+    event_dataset = load_dataset[args.dataset](dataset='all_event_questions.csv', type='events_qa')
+    supplier_dataset = load_dataset[args.dataset](dataset='all_supplier_questions.csv', type='suppliers_qa')
+    price_dataset = load_dataset[args.dataset](dataset='all_price_questions.csv', type='price_qa')
+    lead_time_dataset = load_dataset[args.dataset](dataset='all_lead_time_questions.csv', type='lead_time_qa')
+
+    event_idx_split = event_dataset.get_idx_split() 
+    supplier_idx_split = supplier_dataset.get_idx_split()
+    price_idx_split = price_dataset.get_idx_split()
+    lead_time_idx_split = lead_time_dataset.get_idx_split()
 
     # Step 2: Build Node Classification Dataset
     print("Build Node Classification Dataset")
-    train_dataset = [dataset[i] for i in idx_split['train'] if dataset[i] is not None] # TODO remove the slicing
+    # train_dataset = [event_dataset[i] for i in event_idx_split['train']] + [supplier_dataset[i] for i in supplier_idx_split['train']]
+    train_dataset = [price_dataset[i] for i in price_idx_split['train']] + [lead_time_dataset[i] for i in lead_time_idx_split['train']] + \
+                    [event_dataset[i] for i in event_idx_split['train']] + [supplier_dataset[i] for i in supplier_idx_split['train']]
     print("load val dataset")
-    val_dataset = [dataset[i] for i in idx_split['val'] if dataset[i] is not None] # TODO remove the slicing
+    # val_dataset = [event_dataset[i] for i in event_idx_split['val']] + [supplier_dataset[i] for i in supplier_idx_split['val']]
+    val_dataset = [price_dataset[i] for i in price_idx_split['val']] + [lead_time_dataset[i] for i in lead_time_idx_split['val']] + \
+                    [event_dataset[i] for i in event_idx_split['val']] + [supplier_dataset[i] for i in supplier_idx_split['val']]
     print("load test dataset")
-    test_dataset = [dataset[i] for i in idx_split['test'] if dataset[i] is not None] # TODO remove the slicing
+    test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']] + \
+                    [event_dataset[i] for i in event_idx_split['test']] + [supplier_dataset[i] for i in supplier_idx_split['test']]
+    # test_dataset = [price_dataset[i] for i in price_idx_split['test']]
 
     train_loader = DataLoader(train_dataset, batch_size=args.batch_size, drop_last=True, pin_memory=False, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_dataset, batch_size=args.batch_size, drop_last=False, pin_memory=False, shuffle=False, collate_fn=collate_fn)
@@ -47,7 +61,7 @@ def main(args):
     # Step 3: Build Model
     print("Load llama from the path")
     args.llm_model_path = llama_model_path[args.llm_model_name]
-    model = load_model[args.model_name](graph_type=dataset.graph_type, args=args) # remove ", init_prompt=dataset.prompt" from the parameter list
+    model = load_model[args.model_name](graph_type='Contextualized Supply Chain Graph', args=args) # remove ", init_prompt=dataset.prompt" from the parameter list
 
     # Step 4 Set Optimizer
     print("Set Optimizer")
@@ -75,10 +89,6 @@ def main(args):
             for step, batch in enumerate(train_loader):
                 optimizer.zero_grad()
                 loss = model(batch)
-                # if loss.isnan():
-                    # print("Loss is NaN")
-                    # print(f'step {step}')
-                    # print(f'loss {loss}')
                 loss.backward()
 
                 clip_grad_norm_(optimizer.param_groups[0]['params'], 0.01)
@@ -107,11 +117,6 @@ def main(args):
             with torch.no_grad():
                 for step, batch in enumerate(val_loader):
                     loss = model(batch)
-                    # if loss.isnan():
-                    #     print("Loss is NaN")
-                    #     print(f'step {step}')
-                    #     print(f'loss {loss}')
-                    #     exit()
                     val_loss += loss.item()
                 val_loss = val_loss/len(val_loader)
                 print(f"Epoch: {epoch}|{args.num_epochs}: Val Loss: {val_loss}")

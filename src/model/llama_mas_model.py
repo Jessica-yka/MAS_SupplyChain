@@ -99,21 +99,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         action_dem_dict = {}
         total_chat_summary = ""
         t_emergent_events = im_env.emergent_events.get(period, {'events': [], 'affected_agents': []})
-        # for event in t_emergent_events:
-            # if event == "demand_surge":
-            #     print("There is a sudden demand surge. ")
-            #     im_env.create_demand_surge()
-            # if event == "sudden_shutdown":
-            #     print("There is a sudden shutdown event. ")
-            #     shutdown_list = im_env.shut_seq[period]
-            #     for stage_id, agent_id in shutdown_list:
-            #         state_dict = im_env.create_shutdown_event(stage_id, agent_id, state_dict)
-                    
-            # if event == "recovery":
-            #     print("Here is a recovery event. ")
-            #     recovery_list = im_env.rec_seq[period]
-            #     for (stage_id, agent_id) in recovery_list:
-            #         im_env.create_recovery_event(stage_id, agent_id)
+
 
         for stage_id in range(num_stages):
             for agent_id in range(num_agents_per_stage):

@@ -7,7 +7,7 @@ import sys
 from tqdm import tqdm
 from torch_geometric.data.data import Data
 import sys
-# sys.path.append('/data/yanjia/MAS_SupplyChain')
+sys.path.append('/data/yanjia/MAS_SupplyChain')
 from src.gnn.preprocess.generate_split import generate_split
 from src.gnn.preprocess.lm_modeling import load_model, load_text2embedding
 
@@ -18,13 +18,8 @@ parser.add_argument('--dataset', type=str, default='large_graph_test')
 args = parser.parse_args()
 model_name = 'sbert'
 path = f'src/gnn/gnn_dataset/{args.dataset}'
-# num_graph = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
-# num_data_per_graph = 5
-# num_data = num_graph * num_data_per_graph
-num_data = len([data for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')])
-df_train = pd.read_csv(f'{path}/all_train_questions.csv')
-num_train_data = len(df_train)
-print("#data in total: ", num_data)
+
+
 # Set to use only one GPU
 os.environ["CUDA_VISIBLE_DEVICES"] = "0"
 
@@ -37,7 +32,7 @@ def generate_text_embedding(path: str):
     def _encode_graph():
         print('Encoding graphs...')
         os.makedirs(f'{path}/graphs', exist_ok=True)
-        for i in tqdm(range(num_data)):
+        for i in tqdm(data_list):
             nodes = pd.read_csv(f'{path}/nodes/{i}.csv')
             edges = pd.read_csv(f'{path}/edges/{i}.csv')
             x = text2embedding(model, tokenizer, device, nodes.node_attr.tolist())
@@ -51,13 +46,13 @@ def generate_text_embedding(path: str):
 
     # _encode_graph()
 
-    df_train = pd.read_csv(f'{path}/all_train_questions.csv')
+    # df_train = pd.read_csv(f'{path}/all_train_questions.csv')
     # df_test = pd.read_csv(f'{path}/all_test_questions.csv')
     os.makedirs(f'{path}/graphs/', exist_ok=True)
     model, tokenizer, device = load_model[model_name]()
     text2embedding = load_text2embedding[model_name]
 
-    _encode_questions(df=df_train, filename='train')
+    # _encode_questions(df=df_train, filename='train')
     # _encode_questions(df=df_test, filename='test')
     _encode_graph()
 
@@ -65,6 +60,32 @@ def generate_text_embedding(path: str):
 
 if __name__ == '__main__':
 
+    for_train = True
+    if for_train:
+        path = os.path.join(path, 'train_data')
+    else:
+        path = os.path.join(path, 'test_data')
+
+    data_list = [data.strip('.csv') for data in os.listdir(f'{path}/nodes') if data.endswith('.csv')]
+    num_data = len(data_list)
+
+    print("#data in total: ", num_data)
+    df_events = pd.read_csv(f'{path}/all_event_questions.csv')
+    num_events_qa = len(df_events)
+    df_suppliers = pd.read_csv(f'{path}/all_supplier_questions.csv')
+    num_suppliers_qa = len(df_suppliers)
+    df_price = pd.read_csv(f'{path}/all_price_questions.csv')
+    num_price_qa = len(df_price)
+    df_lead_time = pd.read_csv(f'{path}/all_lead_time_questions.csv')
+    num_lead_time_qa = len(df_lead_time)
+
     generate_text_embedding(path=path)
-    generate_split(num_train_data, f'{path}/split')
+
+    if for_train:
+
+        generate_split(num_events_qa, f'{path}/split/events_qa')
+        generate_split(num_suppliers_qa, f'{path}/split/suppliers_qa')
+        generate_split(num_price_qa, f'{path}/split/price_qa')
+        generate_split(num_lead_time_qa, f'{path}/split/lead_time_qa')
+
     print("Done!")

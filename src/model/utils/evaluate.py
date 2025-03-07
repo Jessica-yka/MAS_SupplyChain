@@ -14,6 +14,16 @@ def get_accuracy_gqa(path):
     return correct / len(df)
 
 
+def get_accuracy_sc_qa(path):
+    df = pd.read_json(path, lines=True)
+    # compute accuracy
+    correct = 0
+    for pred, label in zip(df["pred"], df["label"]):
+        if str(label) in str(pred):
+            correct += 1
+    return correct / len(df)
+
+
 def get_accuracy_expla_graphs(path):
     df = pd.read_json(path, lines=True)
     # compute accuracy
@@ -129,7 +139,7 @@ def get_accuracy_webqsp(path):
 
 
 eval_funcs = {
-    "supplychain_graphs": get_accuracy_sc_graphs,
+    "supplychain_graphs": get_accuracy_sc_qa,
     "expla_graphs": get_accuracy_expla_graphs,
     "scene_graphs": get_accuracy_gqa,
     "scene_graphs_baseline": get_accuracy_gqa,

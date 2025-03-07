@@ -3,7 +3,7 @@ import numpy as np
 from sklearn.model_selection import train_test_split
 
 
-def generate_split(num_nodes, path):
+def generate_split(num_nodes: str, path: str):
 
     # Split the dataset into train, val, and test sets
     indices = np.arange(num_nodes)

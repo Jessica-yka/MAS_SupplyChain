@@ -25,17 +25,26 @@ def main(args):
     seed_everything(seed=seed)
     print(args)
 
-    dataset = load_dataset[args.dataset]()
-    idx_split = dataset.get_idx_split()
+    # dataset = load_dataset[args.dataset](dataset='all_train_questions.csv')
+    event_dataset = load_dataset[args.dataset](dataset='all_event_questions.csv', type='events_qa')
+    supplier_dataset = load_dataset[args.dataset](dataset='all_supplier_questions.csv', type='suppliers_qa')
+    price_dataset = load_dataset[args.dataset](dataset='all_price_questions.csv', type='price_qa')
+    lead_time_dataset = load_dataset[args.dataset](dataset='all_lead_time_questions.csv', type='lead_time_qa')
+    event_idx_split = event_dataset.get_idx_split() 
+    supplier_idx_split = supplier_dataset.get_idx_split()
+    price_idx_split = price_dataset.get_idx_split()
+    lead_time_idx_split = lead_time_dataset.get_idx_split()
 
     # Step 2: Build Node Classification Dataset
-    test_dataset = [dataset[i] for i in idx_split['test']]
-    # test_dataset = [dataset[i] for i in idx_split['train']] # TODO: change to test
+    print("load test dataset")
+    test_dataset = [event_dataset[i] for i in event_idx_split['test']] + [supplier_dataset[i] for i in supplier_idx_split['test']]
+    # test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']]
+
     test_loader = DataLoader(test_dataset, batch_size=args.eval_batch_size, drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
     
     # Step 3: Build Model
     args.llm_model_path = llama_model_path[args.llm_model_name]
-    model = load_model[args.model_name](graph=dataset.graph, graph_type=dataset.graph_type, args=args)
+    model = load_model[args.model_name](graph=event_dataset.graph, graph_type=event_dataset.graph_type, args=args)
 
     # Step 4. Evaluating
     os.makedirs(f'{args.output_dir}/{args.dataset}', exist_ok=True)

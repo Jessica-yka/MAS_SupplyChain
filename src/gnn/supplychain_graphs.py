@@ -8,7 +8,8 @@ from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
 import os
 from tqdm import tqdm
 
-PATH = 'src/gnn/gnn_dataset/large_graph_test'
+PATH = 'src/gnn/gnn_dataset/large_graph_test/train_data'
+
 path_nodes = f'{PATH}/nodes'
 path_edges = f'{PATH}/edges'
 path_graphs = f'{PATH}/graphs'
@@ -17,38 +18,32 @@ cached_graph = f'{PATH}/cached_graphs'
 cached_desc = f'{PATH}/cached_desc'
 
 class SupplyChainGraphsDataset(Dataset):
-    def __init__(self, dataset='all_train_questions.csv'):
+    def __init__(self, dataset='all_event_questions.csv', type: str = 'event_qa'):
         super().__init__()
 
         self.text = pd.read_csv(f'{PATH}/{dataset}')
+        self.num_data = len(self.text)
         # self.prompt = 'Question: Do argument 1 and argument 2 support or counter each other? Answer in one word in the form of \'support\' or \'counter\'.\n\nAnswer:'
         self.graph = None
         self.graph_type = 'Contextualized Supply Chain Graph'
+        self.type = type
 
     def __len__(self):
         """Return the len of the dataset."""
         return len(self.text)
 
     def __getitem__(self, index):
-        try:
-            question = self.text.loc[index, 'question']
-            label = self.text.loc[index, 'label']
-            data_index = int(self.text.loc[index, 'graph_idx'])
-        except KeyError:
-            return 
-        
-        # nodes = pd.read_csv(f'{PATH}/nodes/{graph_idx}.csv')
-        # edges = pd.read_csv(f'{PATH}/edges/{graph_idx}.csv')
 
-        # graph = torch.load(f'{PATH}/graphs/{graph_idx}.pt')        
-        # desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
+        question = self.text.loc[index, 'question']
+        label = self.text.loc[index, 'label']
+        data_index = int(self.text.loc[index, 'graph_idx'])
 
         graph = torch.load(f'{cached_graph}/{data_index}.pt')
         desc = open(f'{cached_desc}/{data_index}.txt', 'r').read()
 
         return {
             'id': data_index,
-            'label': label,
+            'label': str(label),
             'desc': desc,
             'graph': graph,
             'question': question,
@@ -57,13 +52,13 @@ class SupplyChainGraphsDataset(Dataset):
     def get_idx_split(self):
 
         # Load the saved indices
-        with open(f'{PATH}/split/train_indices.txt', 'r') as file:
+        with open(f'{PATH}/split/{self.type}/train_indices.txt', 'r') as file:
             train_indices = [int(line.strip()) for line in file]
 
-        with open(f'{PATH}/split/val_indices.txt', 'r') as file:
+        with open(f'{PATH}/split/{self.type}/val_indices.txt', 'r') as file:
             val_indices = [int(line.strip()) for line in file]
 
-        with open(f'{PATH}/split/test_indices.txt', 'r') as file:
+        with open(f'{PATH}/split/{self.type}/test_indices.txt', 'r') as file:
             test_indices = [int(line.strip()) for line in file]
 
         return {'train': train_indices, 'val': val_indices, 'test': test_indices}
@@ -75,19 +70,18 @@ def preprocess(filename: str, require_retrieve: bool):
     os.makedirs(cached_graph, exist_ok=True)
 
     questions = pd.read_csv(f'{PATH}/all_{filename}_questions.csv')
-    q_embs = torch.load(f'{PATH}/q_{filename}_embs.pt')
+    if require_retrieve:
+        q_embs = torch.load(f'{PATH}/q_{filename}_embs.pt')
     for index in tqdm(range(len(questions))):
         data_idx = questions.iloc[index]['graph_idx']
-        # if os.path.exists(f'{cached_graph}/{graph_idx}.pt'
-        #     continue
         graph = torch.load(f'{path_graphs}/{data_idx}.pt')
         nodes = pd.read_csv(f'{path_nodes}/{data_idx}.csv')
         edges = pd.read_csv(f'{path_edges}/{data_idx}.csv')
         if require_retrieve:
-            subg, desc = retrieval_via_pcst(graph, q_embs[data_idx], nodes, edges, topk=12, topk_e=12, cost_e=0.5)
+            subg, desc = retrieval_via_pcst(graph, q_embs[data_idx], nodes, edges, topk=5, topk_e=5, cost_e=0.5)
         else:
             subg = graph
-            desc = nodes.to_csv(index=False)+'\n'+edges.to_csv(index=False)
+            desc = nodes[['id', 'node_attr']].to_csv(index=False)+'\n'+edges[['src', 'edge_attr', 'dst']].to_csv(index=False)
 
         torch.save(subg, f'{cached_graph}/{data_idx}.pt')
         open(f'{cached_desc}/{data_idx}.txt', 'w').write(desc)
@@ -95,13 +89,30 @@ def preprocess(filename: str, require_retrieve: bool):
 
 if __name__ == '__main__':
 
-    preprocess(filename='train', require_retrieve=False)
-    dataset = SupplyChainGraphsDataset()
 
-    # data = dataset[0]
-    # for k, v in data.items():
-    #     print(f'{k}: {v}')
 
+    preprocess(filename='event', require_retrieve=False)
+    preprocess(filename='supplier', require_retrieve=False)
+    preprocess(filename='price', require_retrieve=False)
+    preprocess(filename='lead_time', require_retrieve=False)
+
+
+    dataset = SupplyChainGraphsDataset(dataset='all_event_questions.csv', type='events_qa')
+    split_ids = dataset.get_idx_split()
+    for k, v in split_ids.items():
+        print(f'# {k}: {len(v)}')
+
+    dataset = SupplyChainGraphsDataset(dataset='all_supplier_questions.csv', type='suppliers_qa')
+    split_ids = dataset.get_idx_split()
+    for k, v in split_ids.items():
+        print(f'# {k}: {len(v)}')
+
+    dataset = SupplyChainGraphsDataset(dataset='all_price_questions.csv', type='price_qa')
+    split_ids = dataset.get_idx_split()
+    for k, v in split_ids.items():
+        print(f'# {k}: {len(v)}')
+
+    dataset = SupplyChainGraphsDataset(dataset='all_lead_time_questions.csv', type='lead_time_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
