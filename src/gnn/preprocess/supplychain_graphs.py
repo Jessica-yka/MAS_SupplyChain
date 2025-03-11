@@ -7,13 +7,13 @@ import sys
 from tqdm import tqdm
 from torch_geometric.data.data import Data
 import sys
-sys.path.append('/data/yanjia/MAS_SupplyChain')
-from src.gnn.preprocess.generate_split import generate_split
-from src.gnn.preprocess.lm_modeling import load_model, load_text2embedding
+# sys.path.append('/data/yanjia/MAS_SupplyChain')
+from generate_split import generate_split
+from lm_modeling import load_model, load_text2embedding
 
 import argparse
 parser = argparse.ArgumentParser()
-parser.add_argument('--dataset', type=str, default='large_graph_test')
+parser.add_argument('--dataset', type=str, default='graph_4_4')
 
 args = parser.parse_args()
 model_name = 'sbert'
@@ -41,8 +41,6 @@ def generate_text_embedding(path: str):
             data = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(nodes))
             torch.save(data, f'{path}/graphs/{i}.pt')
 
-    # model, tokenizer, device = load_model[model_name]()
-    # text2embedding = load_text2embedding[model_name]
 
     # _encode_graph()
 
@@ -72,20 +70,23 @@ if __name__ == '__main__':
     print("#data in total: ", num_data)
     df_events = pd.read_csv(f'{path}/all_event_questions.csv')
     num_events_qa = len(df_events)
-    df_suppliers = pd.read_csv(f'{path}/all_supplier_questions.csv')
-    num_suppliers_qa = len(df_suppliers)
+    df_order_fulfill_qa = pd.read_csv(f'{path}/all_order_fulfill_questions.csv')
+    num_order_fulfill_qa = len(df_order_fulfill_qa)
     df_price = pd.read_csv(f'{path}/all_price_questions.csv')
     num_price_qa = len(df_price)
     df_lead_time = pd.read_csv(f'{path}/all_lead_time_questions.csv')
     num_lead_time_qa = len(df_lead_time)
+    df_demand_qa = pd.read_csv(f'{path}/all_demand_questions.csv')
+    num_demand_qa = len(df_demand_qa)
 
     generate_text_embedding(path=path)
 
     if for_train:
 
         generate_split(num_events_qa, f'{path}/split/events_qa')
-        generate_split(num_suppliers_qa, f'{path}/split/suppliers_qa')
+        generate_split(num_order_fulfill_qa, f'{path}/split/order_fulfill_qa')
         generate_split(num_price_qa, f'{path}/split/price_qa')
         generate_split(num_lead_time_qa, f'{path}/split/lead_time_qa')
+        generate_split(num_demand_qa, f'{path}/split/demand_qa')
 
     print("Done!")

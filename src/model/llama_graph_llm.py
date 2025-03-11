@@ -32,11 +32,7 @@ class GraphLLM(torch.nn.Module):
         self.max_new_tokens = args.max_new_tokens
 
         print('Loading LLAMA')
-        # "device": "cuda:0", "device_map": "auto",
-        # kwargs = {
-        #     "max_memory": {0: '80GiB', 1: '80GiB'},
-        #     "revision": "main",
-        # }
+
         kwargs = {
             "max_memory": {0: '20GiB', 1: '20GiB', 2: '20GiB', 3: '20GiB'},
             "device_map": "auto",
@@ -104,7 +100,7 @@ class GraphLLM(torch.nn.Module):
         self.projector = nn.Sequential(
             nn.Linear(args.gnn_hidden_dim, 2048),
             nn.Sigmoid(),
-            nn.Linear(2048, 4096),
+            nn.Linear(2048, args.gnn_out_dim),
         ).to(self.model.device)
 
         self.word_embedding = self.model.model.get_input_embeddings()
@@ -160,9 +156,6 @@ class GraphLLM(torch.nn.Module):
             label_input_ids = labels.input_ids[i][:self.max_new_tokens] + eos_tokens.input_ids
             input_ids = descriptions.input_ids[i][:self.max_txt_len] + questions.input_ids[i] + eos_user_tokens.input_ids + label_input_ids # description length is roughly 500~1200
             inputs_embeds = self.word_embedding(torch.tensor(input_ids).to(self.model.device))
-            # print("shape of bos_embeds", bos_embeds.shape)
-            # print("shape of graph_embeds[i]", graph_embeds[i].shape)
-            # print("shape of inputs_embeds", inputs_embeds.shape)
             inputs_embeds = torch.cat([bos_embeds, graph_embeds[i].unsqueeze(0), inputs_embeds], dim=0)
 
             batch_inputs_embeds.append(inputs_embeds)
@@ -190,11 +183,6 @@ class GraphLLM(torch.nn.Module):
             labels=label_input_ids,
             )
         
-        # # Print the size of the vocabulary
-        # vocab_size = len(self.tokenizer.get_vocab())
-        # print("Vocabulary size:", vocab_size)
-        # print("input sequence size", inputs_embeds.shape)
-        # exit()
         return outputs.loss
 
 

@@ -27,18 +27,22 @@ def main(args):
 
     # dataset = load_dataset[args.dataset](dataset='all_train_questions.csv')
     event_dataset = load_dataset[args.dataset](dataset='all_event_questions.csv', type='events_qa')
-    supplier_dataset = load_dataset[args.dataset](dataset='all_supplier_questions.csv', type='suppliers_qa')
+    order_fulfill_dataset = load_dataset[args.dataset](dataset='all_order_fulfill_questions.csv', type='order_fulfill_qa')
     price_dataset = load_dataset[args.dataset](dataset='all_price_questions.csv', type='price_qa')
     lead_time_dataset = load_dataset[args.dataset](dataset='all_lead_time_questions.csv', type='lead_time_qa')
+    demand_dataset = load_dataset[args.dataset](dataset='all_demand_questions.csv', type='demand_qa')
+
     event_idx_split = event_dataset.get_idx_split() 
-    supplier_idx_split = supplier_dataset.get_idx_split()
+    order_fulfill_idx_split = order_fulfill_dataset.get_idx_split()
     price_idx_split = price_dataset.get_idx_split()
     lead_time_idx_split = lead_time_dataset.get_idx_split()
+    demand_idx_split = demand_dataset.get_idx_split()
 
     # Step 2: Build Node Classification Dataset
     print("load test dataset")
-    test_dataset = [event_dataset[i] for i in event_idx_split['test']] + [supplier_dataset[i] for i in supplier_idx_split['test']]
-    # test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']]
+    test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']] + \
+                    [event_dataset[i] for i in event_idx_split['test']] + [order_fulfill_dataset[i] for i in order_fulfill_idx_split['test']] + \
+                    [demand_dataset[i] for i in demand_idx_split['test']]    # test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']]
 
     test_loader = DataLoader(test_dataset, batch_size=args.eval_batch_size, drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
     

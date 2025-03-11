@@ -4,7 +4,7 @@ import torch
 from torch.utils.data import Dataset
 import sys
 sys.path.append('/data/yanjia/MAS_SupplyChain')
-from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
+# from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
 import os
 from tqdm import tqdm
 

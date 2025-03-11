@@ -19,7 +19,7 @@ def get_accuracy_sc_qa(path):
     # compute accuracy
     correct = 0
     for pred, label in zip(df["pred"], df["label"]):
-        if str(label) in str(pred):
+        if label in pred:
             correct += 1
     return correct / len(df)
 

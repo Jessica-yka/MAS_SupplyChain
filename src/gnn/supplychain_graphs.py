@@ -4,11 +4,11 @@ import torch
 from torch.utils.data import Dataset
 import sys
 sys.path.append('/data/yanjia/MAS_SupplyChain')
-from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
+# from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
 import os
 from tqdm import tqdm
 
-PATH = 'src/gnn/gnn_dataset/large_graph_test/train_data'
+PATH = 'src/gnn/gnn_dataset/graph_4_4/train_data'
 
 path_nodes = f'{PATH}/nodes'
 path_edges = f'{PATH}/edges'
@@ -27,6 +27,7 @@ class SupplyChainGraphsDataset(Dataset):
         self.graph = None
         self.graph_type = 'Contextualized Supply Chain Graph'
         self.type = type
+        self.init_prompt = "Please answer the given question."
 
     def __len__(self):
         """Return the len of the dataset."""
@@ -78,10 +79,12 @@ def preprocess(filename: str, require_retrieve: bool):
         nodes = pd.read_csv(f'{path_nodes}/{data_idx}.csv')
         edges = pd.read_csv(f'{path_edges}/{data_idx}.csv')
         if require_retrieve:
-            subg, desc = retrieval_via_pcst(graph, q_embs[data_idx], nodes, edges, topk=5, topk_e=5, cost_e=0.5)
+            # TODO: dont know what to do
+            raise NotImplementedError
+            # subg, desc = retrieval_via_pcst(graph, q_embs[data_idx], nodes, edges, topk=5, topk_e=5, cost_e=0.5)
         else:
             subg = graph
-            desc = nodes[['id', 'node_attr']].to_csv(index=False)+'\n'+edges[['src', 'edge_attr', 'dst']].to_csv(index=False)
+            desc = nodes[['node_id', 'node_attr']].to_csv(index=False)+'\n'+edges[['src', 'edge_attr', 'dst']].to_csv(index=False)
 
         torch.save(subg, f'{cached_graph}/{data_idx}.pt')
         open(f'{cached_desc}/{data_idx}.txt', 'w').write(desc)
@@ -92,9 +95,10 @@ if __name__ == '__main__':
 
 
     preprocess(filename='event', require_retrieve=False)
-    preprocess(filename='supplier', require_retrieve=False)
+    preprocess(filename='order_fulfill', require_retrieve=False)
     preprocess(filename='price', require_retrieve=False)
     preprocess(filename='lead_time', require_retrieve=False)
+    preprocess(filename='demand', require_retrieve=False)
 
 
     dataset = SupplyChainGraphsDataset(dataset='all_event_questions.csv', type='events_qa')
@@ -102,7 +106,7 @@ if __name__ == '__main__':
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
 
-    dataset = SupplyChainGraphsDataset(dataset='all_supplier_questions.csv', type='suppliers_qa')
+    dataset = SupplyChainGraphsDataset(dataset='all_order_fulfill_questions.csv', type='order_fulfill_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
@@ -113,6 +117,11 @@ if __name__ == '__main__':
         print(f'# {k}: {len(v)}')
 
     dataset = SupplyChainGraphsDataset(dataset='all_lead_time_questions.csv', type='lead_time_qa')
+    split_ids = dataset.get_idx_split()
+    for k, v in split_ids.items():
+        print(f'# {k}: {len(v)}')
+
+    dataset = SupplyChainGraphsDataset(dataset='all_demand_questions.csv', type='demand_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')

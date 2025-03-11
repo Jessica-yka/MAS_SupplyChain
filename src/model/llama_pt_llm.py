@@ -3,6 +3,8 @@ import contextlib
 import torch
 from torch.cuda.amp import autocast as autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
+from transformers import BitsAndBytesConfig
+from torch_scatter import scatter
 from peft import (
     LoraConfig,
     get_peft_model,
@@ -31,7 +33,7 @@ class PromptTuningLLM(torch.nn.Module):
 
         print('Loading LLAMA')
         kwargs = {
-            "max_memory": {0: '80GiB', 1: '80GiB'},
+            "max_memory": {0: '20GiB', 1: '20GiB', 2: '20GiB', 3: '20GiB'},
             "device_map": "auto",
             "revision": "main",
         }
@@ -39,11 +41,18 @@ class PromptTuningLLM(torch.nn.Module):
         self.tokenizer.pad_token_id = 0
         self.tokenizer.padding_side = 'left'
 
+        # Configure quantization using BitsAndBytesConfig
+        bnb_config = BitsAndBytesConfig(
+            load_in_4bit=True,  # Use 8-bit quantization
+            llm_int8_threshold=4.0,  # Optional: Adjust this threshold for lower memory usage
+        )
+
         model = AutoModelForCausalLM.from_pretrained(
             args.llm_model_path,
-            torch_dtype=torch.float16,
-            low_cpu_mem_usage=True,
-            **kwargs
+            quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
+            device_map="auto",              # Automatically map the model to GPU(s)
+            max_memory=kwargs["max_memory"],  # Set the maximum memory for each device
+            revision=kwargs["revision"],  # Use the main revision of the model
         )
 
         if args.llm_frozen == 'True':

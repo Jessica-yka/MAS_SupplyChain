@@ -15,8 +15,8 @@ from collections import defaultdict
 np.random.seed(0)
 
 env_configs_list = {
-    "large_graph_test": {
-        "config_name": "large_graph_test",
+    "graph_4_4": {
+        "config_name": "graph_4_4",
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 1,
         "num_init_customers": 1,
@@ -28,7 +28,7 @@ env_configs_list = {
         "price_cost_dist": {'dist': 'uniform', 'lb': 1, 'ub': 8}, # constant/uniform/normal/etc
         "lead_time_dist": {'dist': 'uniform', 'lb': 2, 'ub': 15}, # constant/uniform
         "prod_capacity_dist": {'dist': 'uniform', 'lb': 25, 'ub': 40}, # constant/uniform("uniform", 25, 40)
-        "demand_fn": {"dist": "constant_demand", "mean": 5, "trend": "linear", 'with_noise': True}, # constant/functional
+        "demand_fn": {"dist": "uniform_demand", "lb": 5, "ub": 8, "mean": 5, "trend": "linear", 'with_noise': True}, # constant/functional
         "holding_costs_dist": {"dist": "constant", "mean": 10}, 
         "backlog_costs_dist": {'dist': "constant", "mean": 5}, 
         "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 

@@ -1,0 +1,6 @@
+python3 train.py --dataset supplychain_graphs --model_name graph_llm --seed 0 --batch_size 8 --llm_model_name 7b_chat --gnn_out_dim 4096 > log_train_graph_llm_7b_chat_8.log 2>&1
+python3 train.py --dataset supplychain_graphs --model_name graph_llm --seed 0 --batch_size 4 --llm_model_name 13b_chat --gnn_out_dim 5120 > log_train_graph_llm_13b_chat_4.log 2>&1
+python3 inference.py --dataset supplychain_graphs --model_name inference_llm --seed 0 --llm_model_name 7b_chat --eval_batch_size 20 --gnn_out_dim 4096 > log_inference_llm_7b_chat_20.log 2>&1
+python3 inference.py --dataset supplychain_graphs --model_name inference_llm --seed 0 --llm_model_name 13b_chat --eval_batch_size 20 --gnn_out_dim 5120 > log_inference_llm_13b_chat_20.log 2>&1
+python3 train.py --dataset supplychain_graphs --model_name pt_llm --seed 0 --batch_size 8 --llm_model_name 7b_chat --gnn_out_dim 4096 > log_train_pt_llm_7b_chat_8.log 2>&1
+python3 train.py --dataset supplychain_graphs --model_name pt_llm --seed 0 --batch_size 4 --llm_model_name 13b_chat --gnn_out_dim 5120 > log_train_pt_llm_13b_chat_4.log 2>&1

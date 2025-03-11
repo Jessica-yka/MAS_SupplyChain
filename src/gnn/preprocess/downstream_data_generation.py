@@ -676,48 +676,6 @@ def generate_lead_time_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame,
 
                                                                                                                                                                     
 
-def rank_suppliers_by_reliability(G: nx.DiGraph, env: dict, target_node_stage_idx: int, target_node_agent_idx: int, use_event_rank: bool, use_price_rank: bool, use_lead_time_rank: bool): 
-
-    supp_stage_idx = target_node_stage_idx + 1
-    num_agents_per_stage = env['num_agents_per_stage']
-    # num_stages = env['num_stages']
-    sale_prices = env['sale_prices'][supp_stage_idx*num_agents_per_stage:(supp_stage_idx+1)*num_agents_per_stage]
-    lead_times = env['lead_times'][target_node_stage_idx, target_node_agent_idx]
-    # order_fulfill_rates = env['order_fulfill_rates'][supp_stage_idx, :, target_node_agent_idx]
-    
-    # rank suppliers by price
-    if use_price_rank:
-        price_rank_score = rankdata(sale_prices, method='min')
-    else:
-        price_rank_score = np.zeros(num_agents_per_stage)
-
-    # rank suppliers by lead time
-    if use_lead_time_rank:
-        lead_times_rank_score = rankdata(lead_times, method='min')
-    else:
-        lead_times_rank_score = np.zeros(num_agents_per_stage)
-
-    # rank suppliers by order fulfillment
-    order_fulfillments_rank_score = np.zeros(num_agents_per_stage)
-    # order_fulfillments_rank_score = rankdata(-order_fulfill_rates, method='min')
-
-    # rank suppliers by the event effect
-    if use_event_rank:
-        event_effect_rank = np.zeros(num_agents_per_stage)
-        for event, affected_agents in env['events'].items():
-            sid, aid = affected_agents
-            for supp_agent_idx in range(num_agents_per_stage):
-                if check_connection(G=G, event_target_node=f"stage_{sid}_agent_{aid}", target_node=f"stage_{supp_stage_idx}_agent_{supp_agent_idx}"):
-                    event_effect_rank[supp_agent_idx] += 1
-        event_effect_rank_score = rankdata(event_effect_rank, method='min')
-    else:
-        event_effect_rank_score = np.zeros(num_agents_per_stage)
-
-    # print("price", price_rank_score.shape)
-    # print("lead time", lead_times_rank_score.shape)
-    # print("order", order_fulfillments_rank_score.shape)
-    # print("event", event_effect_rank_score.shape)
-    return price_rank_score + lead_times_rank_score + order_fulfillments_rank_score + event_effect_rank_score
 
 
 if __name__ == "__main__":

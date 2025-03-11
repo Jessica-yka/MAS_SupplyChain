@@ -1,99 +1,136 @@
 import torch
 import numpy as np
-from pcst_fast import pcst_fast
 from torch_geometric.data.data import Data
+import random
+import networkx as nx
+import pandas as pd
+import os
+import json
 
 
-def retrieval_via_pcst(graph, q_emb, textual_nodes, textual_edges, topk=3, topk_e=3, cost_e=0.5):
-    c = 0.01
-    if len(textual_nodes) == 0 or len(textual_edges) == 0:
-        desc = textual_nodes.to_csv(index=False) + '\n' + textual_edges.to_csv(index=False, columns=['src', 'edge_attr', 'dst'])
-        graph = Data(x=graph.x, edge_index=graph.edge_index, edge_attr=graph.edge_attr, num_nodes=graph.num_nodes)
-        return graph, desc
+def check_connection(G, event_target_node, target_node):
 
-    root = -1  # unrooted
-    num_clusters = 1
-    pruning = 'gw'
-    verbosity_level = 0
-    if topk > 0:
-        n_prizes = torch.nn.CosineSimilarity(dim=-1)(q_emb, graph.x)
-        topk = min(topk, graph.num_nodes)
-        _, topk_n_indices = torch.topk(n_prizes, topk, largest=True)
+    return nx.has_path(G, source=event_target_node, target=target_node)
 
-        n_prizes = torch.zeros_like(n_prizes)
-        n_prizes[topk_n_indices] = torch.arange(topk, 0, -1).float()
-    else:
-        n_prizes = torch.zeros(graph.num_nodes)
 
-    if topk_e > 0:
-        e_prizes = torch.nn.CosineSimilarity(dim=-1)(q_emb, graph.edge_attr)
-        topk_e = min(topk_e, e_prizes.unique().size(0))
+def get_event_sub_df_edges(G: nx.DiGraph, df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_node: str, path: str=None):
 
-        topk_e_values, _ = torch.topk(e_prizes.unique(), topk_e, largest=True)
-        e_prizes[e_prizes < topk_e_values[-1]] = 0.0
-        last_topk_e_value = topk_e
-        for k in range(topk_e):
-            indices = e_prizes == topk_e_values[k]
-            value = min((topk_e-k)/sum(indices), last_topk_e_value)
-            e_prizes[indices] = value
-            last_topk_e_value = value*(1-c)
-        # reduce the cost of the edges such that at least one edge is selected
-        cost_e = min(cost_e, e_prizes.max().item()*(1-c/2))
-    else:
-        e_prizes = torch.zeros(graph.num_edges)
+    # G_sub = G.edge_subgraph([(u, v) for u, v, d in G.edges(data=True) if d['label']=='is the supplier of']).copy()
 
-    costs = []
-    edges = []
-    vritual_n_prizes = []
-    virtual_edges = []
-    virtual_costs = []
-    mapping_n = {}
-    mapping_e = {}
-    for i, (src, dst) in enumerate(graph.edge_index.T.numpy()):
-        prize_e = e_prizes[i]
-        if prize_e <= cost_e:
-            mapping_e[len(edges)] = i
-            edges.append((src, dst))
-            costs.append(cost_e - prize_e)
-        else:
-            virtual_node_id = graph.num_nodes + len(vritual_n_prizes)
-            mapping_n[virtual_node_id] = i
-            virtual_edges.append((src, virtual_node_id))
-            virtual_edges.append((virtual_node_id, dst))
-            virtual_costs.append(0)
-            virtual_costs.append(0)
-            vritual_n_prizes.append(prize_e - cost_e)
+    related_nodes = list(nx.nodes(nx.dfs_tree(G, target_node))) + list(nx.nodes(nx.dfs_tree(G.reverse(), target_node)))
+    related_nodes = dict(zip(related_nodes, [1 for _ in related_nodes]))
 
-    prizes = np.concatenate([n_prizes, np.array(vritual_n_prizes)])
-    num_edges = len(edges)
-    if len(virtual_costs) > 0:
-        costs = np.array(costs+virtual_costs)
-        edges = np.array(edges+virtual_edges)
+    node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
+    df_simp_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+    
+    row_idx = 0
+    # list all the edges in G_sub and make it df_simp_edges
+    # get the label of edges
+    for src_name, dst_name, data in G.edges(data=True):
+        if related_nodes.get(src_name, 0) and related_nodes.get(dst_name, 0):
+            df_simp_edges.loc[row_idx] = [node_name_id_map[src_name], data['label'], node_name_id_map[dst_name], src_name, dst_name]
+            row_idx += 1
 
-    vertices, edges = pcst_fast(edges, prizes, costs, root, num_clusters, pruning, verbosity_level)
+    df_events = df_edges[df_edges['label'].str.contains('affects')].reset_index(drop=True)
+    for i in range(len(df_events)):
+        df_simp_edges.loc[row_idx] = [node_name_id_map[df_events.loc[i, 'source']], df_events.loc[i, 'label'], node_name_id_map[df_events.loc[i, 'target']], df_events.loc[i, 'source'], df_events.loc[i, 'target']]
+        row_idx += 1
 
-    selected_nodes = vertices[vertices < graph.num_nodes]
-    selected_edges = [mapping_e[e] for e in edges if e < num_edges]
-    virtual_vertices = vertices[vertices >= graph.num_nodes]
-    if len(virtual_vertices) > 0:
-        virtual_vertices = vertices[vertices >= graph.num_nodes]
-        virtual_edges = [mapping_n[i] for i in virtual_vertices]
-        selected_edges = np.array(selected_edges+virtual_edges)
+    return df_simp_edges
 
-    edge_index = graph.edge_index[:, selected_edges]
-    selected_nodes = np.unique(np.concatenate([selected_nodes, edge_index[0].numpy(), edge_index[1].numpy()]))
 
-    n = textual_nodes.iloc[selected_nodes]
-    e = textual_edges.iloc[selected_edges]
-    desc = n.to_csv(index=False)+'\n'+e.to_csv(index=False, columns=['src', 'edge_attr', 'dst'])
+def get_of_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_node: str):
 
-    mapping = {n: i for i, n in enumerate(selected_nodes.tolist())}
+    node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
+    df_simp_edges = df_edges[(df_edges['source']==target_node)|(df_edges['target']==target_node)].reset_index(drop=True)
+    # get sub df_edges that the edge attrs contains either request or delivery
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request') | df_simp_edges['label'].str.contains('deliverying')].reset_index(drop=True)
 
-    x = graph.x[selected_nodes]
-    edge_attr = graph.edge_attr[selected_edges]
-    src = [mapping[i] for i in edge_index[0].tolist()]
-    dst = [mapping[i] for i in edge_index[1].tolist()]
-    edge_index = torch.LongTensor([src, dst])
-    data = Data(x=x, edge_index=edge_index, edge_attr=edge_attr, num_nodes=len(selected_nodes))
+    df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
+    df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
+    # change the column name "label to edge_attr"
+    df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    # remove aspect column
+    df_simp_edges.drop(columns=['aspect'], inplace=True)
 
-    return data, desc
+    return df_simp_edges
+
+
+def get_demand_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_node: str):
+
+    node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
+    df_simp_edges = df_edges[(df_edges['target']==target_node)].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request')].reset_index(drop=True)
+
+    df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
+    df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
+    # change the column name "label to edge_attr"
+    df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    # remove aspect column
+    df_simp_edges.drop(columns=['aspect'], inplace=True)
+
+    return df_simp_edges
+
+
+def get_lt_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_node: str, path: str=None):
+
+    node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
+
+    df_simp_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+    df_simp_edges = df_edges[df_edges["target"]==target_node].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('lead time')].reset_index(drop=True)
+
+    df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
+    df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
+    # change the column name "label to edge_attr"
+    df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    # remove aspect column
+    df_simp_edges.drop(columns=['aspect'], inplace=True)
+
+    return df_simp_edges
+
+
+def get_price_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_node: str, path: str=None):
+
+    node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
+    df_simp_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+    df_simp_edges = df_edges[df_edges["target"]==target_node].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('upstream agent')].reset_index(drop=True)
+
+    df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
+    df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
+    # change the column name "label to edge_attr"
+    df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    # remove aspect column
+    df_simp_edges.drop(columns=['aspect'], inplace=True)
+
+    return df_simp_edges
+
+
+def get_sub_df_nodes(df_nodes: pd.DataFrame, target_node: str, path: str=None):
+
+    df_nodes_sub = pd.DataFrame(columns=['node_id', 'node_attr', 'type', 'name'])
+    # the competitors at the save stage
+    for i in range(len(df_nodes)):
+        # itself
+        if df_nodes.loc[i, 'name'] == target_node:
+            attr = (f"{df_nodes.loc[i, 'name']}: "
+                    f"price: {df_nodes.loc[i, 'sale_price']}, "
+                    f"production cost: {df_nodes.loc[i, 'prod_cost']}, "
+                    f"production capacity: {df_nodes.loc[i, 'prod_capacity']}, "
+                    f"inventory: {df_nodes.loc[i, 'inventory']}, "
+                    f"backlog: {df_nodes.loc[i, 'backlog']}, "
+                    f"upstream backlog: {df_nodes.loc[i, 'upstream_backlog']}")
+            df_nodes_sub.loc[i, ['node_id', 'node_attr', 'type', 'name']] = [df_nodes.loc[i, 'node_id'], attr, df_nodes.loc[i, 'type'], df_nodes.loc[i, 'name']]
+        # the suppliers of the target node
+        elif f"stage_{df_nodes.loc[i, 'stage_id']-1}" in target_node:
+            attr = (f"{df_nodes.loc[i, 'name']}: "
+                    f"price: {df_nodes.loc[i, 'sale_price']}, "
+                    f"production capacity: {df_nodes.loc[i, 'prod_capacity']}")
+            df_nodes_sub.loc[i, ['node_id', 'node_attr', 'type', 'name']] = [df_nodes.loc[i, 'node_id'], attr, df_nodes.loc[i, 'type'], df_nodes.loc[i, 'name']]
+        else: # the suppliers of the suppliers or the downstream customers
+            attr = (f"{df_nodes.loc[i, 'name']}")
+            df_nodes_sub.loc[i, ['node_id', 'node_attr', 'type', 'name']] = [df_nodes.loc[i, 'node_id'], attr, df_nodes.loc[i, 'type'], df_nodes.loc[i, 'name']]
+
+    # df_nodes_sub.to_csv(path, index=False)
+    return df_nodes_sub
