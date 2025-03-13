@@ -13,21 +13,30 @@ PATH = 'src/gnn/gnn_dataset/graph_4_4/train_data'
 path_nodes = f'{PATH}/nodes'
 path_edges = f'{PATH}/edges'
 path_graphs = f'{PATH}/graphs'
+path_desc = f'{PATH}/desc'
+kaping_desc = f'{PATH}/kaping_desc'
 
-cached_graph = f'{PATH}/cached_graphs'
-cached_desc = f'{PATH}/cached_desc'
+# cached_graph = f'{PATH}/cached_graphs'
+# cached_desc = f'{PATH}/cached_desc'
 
-class SupplyChainGraphsDataset(Dataset):
-    def __init__(self, dataset='all_event_questions.csv', type: str = 'event_qa'):
+# For GraphToken Experiment
+class SupplyChainGraphsInferenceDataset(Dataset):
+    def __init__(self, prompting_tech: str, dataset='all_event_questions.csv', type: str = 'event_qa'):
         super().__init__()
 
         self.text = pd.read_csv(f'{PATH}/{dataset}')
         self.num_data = len(self.text)
-        # self.prompt = 'Question: Do argument 1 and argument 2 support or counter each other? Answer in one word in the form of \'support\' or \'counter\'.\n\nAnswer:'
         self.graph = None
         self.graph_type = 'Contextualized Supply Chain Graph'
         self.type = type
-        self.init_prompt = "Please answer the given question."
+        self.prompting_tech = prompting_tech # cot/cot-bag/kaping
+        if self.prompting_tech == 'cot':
+            self.prompt = "Let's think step by step."
+        elif self.prompting_tech == 'cot-bag':
+            self.prompt = "Let's construct a graph with the nodes and edges first."
+
+
+
 
     def __len__(self):
         """Return the len of the dataset."""
@@ -36,18 +45,25 @@ class SupplyChainGraphsDataset(Dataset):
     def __getitem__(self, index):
 
         question = self.text.loc[index, 'question']
+        if self.prompting_tech == 'cot':
+            question = f"{question} {self.prompt}"
+        elif self.prompting_tech == 'cot-bag':
+            question = f"{self.prompt}\n{question}"
         label = self.text.loc[index, 'label']
         data_index = int(self.text.loc[index, 'graph_idx'])
 
-        graph = torch.load(f'{cached_graph}/{data_index}.pt')
-        desc = open(f'{cached_desc}/{data_index}.txt', 'r').read()
+        # graph = torch.load(f'{path_graphs}/{data_index}.pt')
+        if self.prompting_tech == 'kaping':
+            desc = open(f'{kaping_desc}/{data_index}.txt', 'r').read()
+        else:
+            desc = open(f'{path_desc}/{data_index}.txt', 'r').read()
 
         return {
             'id': data_index,
             'label': str(label),
             'desc': desc,
-            'graph': graph,
             'question': question,
+            # 'graph': graph,
         }
 
     def get_idx_split(self):
@@ -70,27 +86,27 @@ class SupplyChainGraphsDataset(Dataset):
 if __name__ == '__main__':
 
 
-    dataset = SupplyChainGraphsDataset(dataset='all_event_questions.csv', type='events_qa')
+    dataset = SupplyChainGraphsInferenceDataset(dataset='all_event_questions.csv', type='events_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
 
-    dataset = SupplyChainGraphsDataset(dataset='all_order_fulfill_questions.csv', type='order_fulfill_qa')
+    dataset = SupplyChainGraphsInferenceDataset(dataset='all_order_fulfill_questions.csv', type='order_fulfill_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
 
-    dataset = SupplyChainGraphsDataset(dataset='all_price_questions.csv', type='price_qa')
+    dataset = SupplyChainGraphsInferenceDataset(dataset='all_price_questions.csv', type='price_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
 
-    dataset = SupplyChainGraphsDataset(dataset='all_lead_time_questions.csv', type='lead_time_qa')
+    dataset = SupplyChainGraphsInferenceDataset(dataset='all_lead_time_questions.csv', type='lead_time_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')
 
-    dataset = SupplyChainGraphsDataset(dataset='all_demand_questions.csv', type='demand_qa')
+    dataset = SupplyChainGraphsInferenceDataset(dataset='all_demand_questions.csv', type='demand_qa')
     split_ids = dataset.get_idx_split()
     for k, v in split_ids.items():
         print(f'# {k}: {len(v)}')

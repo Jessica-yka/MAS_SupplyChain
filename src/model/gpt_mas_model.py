@@ -6,11 +6,11 @@ import numpy as np
 from typing import List
 from tqdm.notebook import tqdm
 from autogen import ConversableAgent
-# sys.path.append('src')
-from src.model.llm_config import llm_config_list
-from src.model.utils.utils import extract_pairs
-from src.model.form_msg import generate_msg
-from src.model.utils.utils import visualize_state, save_string_to_file, update_sup_action
+sys.path.append('src/model')
+from .llm_config import llm_config_list
+from .utils.utils import extract_pairs
+from .form_msg import generate_msg
+from .utils.utils import visualize_state, save_string_to_file, update_sup_action
 
 np.random.seed(0)
 
@@ -140,15 +140,15 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
 
                     if enable_graph_change:
                         sup_action = state_dict[f'stage_{stage_id}_agent_{agent_id}']['suppliers']
-                        if stage_id < num_stages - 1:
-                            sup_action = update_sup_action(sup_action=sup_action, rm_match=match[0], add_match=match[1])
+                        # if stage_id < num_stages - 1:
+                        sup_action = update_sup_action(sup_action=sup_action, rm_match=match[0], add_match=match[1])
                         action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action
 
                         stage_order_action = np.zeros(num_agents_per_stage, dtype=int)
-                        if stage_id < num_stages - 1:
-                            match2 = match[2]
-                        else:
-                            match2 = match[0]
+                        # if stage_id < num_stages - 1:
+                        match2 = match[2]
+                        # else:
+                            # match2 = match[0]
                         if match2:
                             supplier_order_dict = extract_pairs(match2)
                             try:

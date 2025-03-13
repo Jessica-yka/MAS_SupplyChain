@@ -12,7 +12,7 @@ from src.model import load_model, llama_model_path
 from src.gnn.dataset import load_dataset
 from src.model.utils.evaluate import eval_funcs
 from src.model.llm_config import parse_args_llama
-from src.model.utils.ckpt import _save_checkpoint, _reload_best_model
+from src.model.utils.ckpt import _save_checkpoint, _reload_best_model, _reload_model
 from src.model.utils.collate import collate_fn
 from src.model.utils.seed import seed_everything
 from src.model.utils.lr_schedule import adjust_learning_rate
@@ -44,14 +44,17 @@ def main(args):
 
     # Step 2: Build Node Classification Dataset
     print("Build Node Classification Dataset")
+    # train_dataset = [price_dataset[i] for i in price_idx_split['train']] + [lead_time_dataset[i] for i in lead_time_idx_split['train']]
     train_dataset = [price_dataset[i] for i in price_idx_split['train']] + [lead_time_dataset[i] for i in lead_time_idx_split['train']] + \
                     [event_dataset[i] for i in event_idx_split['train']] + [order_fulfill_dataset[i] for i in order_fulfill_idx_split['train']] + \
                     [demand_dataset[i] for i in demand_idx_split['train']]
     print("load val dataset")
+    # val_dataset = [price_dataset[i] for i in price_idx_split['val']] + [lead_time_dataset[i] for i in lead_time_idx_split['val']]
     val_dataset = [price_dataset[i] for i in price_idx_split['val']] + [lead_time_dataset[i] for i in lead_time_idx_split['val']] + \
                     [event_dataset[i] for i in event_idx_split['val']] + [order_fulfill_dataset[i] for i in order_fulfill_idx_split['val']] + \
                     [demand_dataset[i] for i in demand_idx_split['val']]
     print("load test dataset")
+    # test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']]
     test_dataset = [price_dataset[i] for i in price_idx_split['test']] + [lead_time_dataset[i] for i in lead_time_idx_split['test']] + \
                     [event_dataset[i] for i in event_idx_split['test']] + [order_fulfill_dataset[i] for i in order_fulfill_idx_split['test']] + \
                     [demand_dataset[i] for i in demand_idx_split['test']]
@@ -145,7 +148,8 @@ def main(args):
     path = f'{args.output_dir}/{args.dataset}/model_name_{args.model_name}_llm_model_name_{args.llm_model_name}_llm_frozen_{args.llm_frozen}_max_txt_len_{args.max_txt_len}_max_new_tokens_{args.max_new_tokens}_gnn_model_name_{args.gnn_model_name}_patience_{args.patience}_num_epochs_{args.num_epochs}_seed{seed}/best_results.csv'
     print(f'path: {path}')
 
-    model = _reload_best_model(model, args)
+    # model = _reload_best_model(model, args)
+    model = _reload_model(model, "output/supplychain_graphs/model_name_graph_llm_llm_model_name_7b_chat_llm_frozen_True_max_txt_len_1024_max_new_tokens_512_gnn_model_name_gt_patience_2_num_epochs_15_seed4/checkpoint_7.pth")
     model.eval()
     progress_bar_test = tqdm(range(len(test_loader)))
     with open(path, "w") as f:

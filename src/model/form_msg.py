@@ -1,6 +1,6 @@
 import sys
-from src.model.utils.utils import get_state_description, get_demand_description
-from src.model.env import InventoryManagementEnv
+from .utils.utils import get_state_description, get_demand_description
+from .env import InventoryManagementEnv
 
 task1_msg = (
     "Task1: Do you want to remove anyone from your upstream supplier list?\n"
@@ -119,7 +119,7 @@ def get_decision_task(stage: int, im_env, enable_graph_change: bool, enable_pric
     task_msg = ""
     num_tasks = 0        
 
-    if stage < im_env.num_stages - 1 and enable_graph_change: # Ask for supplier updates if it is allowed or it is not a manufacturer
+    if enable_graph_change: # Ask for supplier updates if it is allowed or it is not a manufacturer
         task_msg += f"{task1_msg}\n"
         task_msg += f"{task2_msg}\n"
         num_tasks += 2

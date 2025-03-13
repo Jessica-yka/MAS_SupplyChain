@@ -6,7 +6,28 @@ import networkx as nx
 import pandas as pd
 import os
 import json
+import matplotlib.pyplot as plt
+from scipy.stats import rankdata
 
+def retrieve_subgraph(data_type: str, env: dict, target_node: str, G: nx.DiGraph, df_nodes: pd.DataFrame, df_edges: pd.DataFrame, path: str=None):
+
+    df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
+    if data_type == 'demand':
+        df_simp_edges = get_demand_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+    elif data_type == 'event':
+        df_simp_edges = get_event_sub_df_edges(G=G, df_edges=df_edges, df_nodes=df_nodes, target_node=target_node)
+    elif data_type == 'lead_time':
+        df_simp_edges = get_lt_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+    elif data_type == 'price':
+        df_simp_edges = get_price_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+    elif data_type == 'order_fulfill':
+        df_simp_edges = get_of_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+    else:
+        raise ValueError(f"Invalid data type: {data_type}")
+    visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=path)
+
+    return df_sub_nodes, df_simp_edges
+    
 
 def check_connection(G, event_target_node, target_node):
 
@@ -35,7 +56,7 @@ def get_event_sub_df_edges(G: nx.DiGraph, df_nodes: pd.DataFrame, df_edges: pd.D
     for i in range(len(df_events)):
         df_simp_edges.loc[row_idx] = [node_name_id_map[df_events.loc[i, 'source']], df_events.loc[i, 'label'], node_name_id_map[df_events.loc[i, 'target']], df_events.loc[i, 'source'], df_events.loc[i, 'target']]
         row_idx += 1
-
+    # df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
     return df_simp_edges
 
 
@@ -50,8 +71,10 @@ def get_of_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_n
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
     # change the column name "label to edge_attr"
     df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    # reorder the column names
+    df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
     # remove aspect column
-    df_simp_edges.drop(columns=['aspect'], inplace=True)
+    # df_simp_edges.drop(columns=['aspect'], inplace=True)
 
     return df_simp_edges
 
@@ -60,14 +83,15 @@ def get_demand_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, targ
 
     node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
     df_simp_edges = df_edges[(df_edges['target']==target_node)].reset_index(drop=True)
-    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request')].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request')|df_simp_edges['label'].str.contains('demand')].reset_index(drop=True)
 
     df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
     # change the column name "label to edge_attr"
     df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
     # remove aspect column
-    df_simp_edges.drop(columns=['aspect'], inplace=True)
+    # df_simp_edges.drop(columns=['aspect'], inplace=True)
 
     return df_simp_edges
 
@@ -84,8 +108,9 @@ def get_lt_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_n
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
     # change the column name "label to edge_attr"
     df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
     # remove aspect column
-    df_simp_edges.drop(columns=['aspect'], inplace=True)
+    # df_simp_edges.drop(columns=['aspect'], inplace=True)
 
     return df_simp_edges
 
@@ -101,8 +126,9 @@ def get_price_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, targe
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
     # change the column name "label to edge_attr"
     df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
     # remove aspect column
-    df_simp_edges.drop(columns=['aspect'], inplace=True)
+    # df_simp_edges.drop(columns=['aspect'], inplace=True)
 
     return df_simp_edges
 
@@ -125,8 +151,9 @@ def get_sub_df_nodes(df_nodes: pd.DataFrame, target_node: str, path: str=None):
         # the suppliers of the target node
         elif f"stage_{df_nodes.loc[i, 'stage_id']-1}" in target_node:
             attr = (f"{df_nodes.loc[i, 'name']}: "
-                    f"price: {df_nodes.loc[i, 'sale_price']}, "
-                    f"production capacity: {df_nodes.loc[i, 'prod_capacity']}")
+                    f"price: {df_nodes.loc[i, 'sale_price']}"
+                    # f"production capacity: {df_nodes.loc[i, 'prod_capacity']}"
+                    )
             df_nodes_sub.loc[i, ['node_id', 'node_attr', 'type', 'name']] = [df_nodes.loc[i, 'node_id'], attr, df_nodes.loc[i, 'type'], df_nodes.loc[i, 'name']]
         else: # the suppliers of the suppliers or the downstream customers
             attr = (f"{df_nodes.loc[i, 'name']}")
@@ -134,3 +161,46 @@ def get_sub_df_nodes(df_nodes: pd.DataFrame, target_node: str, path: str=None):
 
     # df_nodes_sub.to_csv(path, index=False)
     return df_nodes_sub
+
+
+def visualize_contextualized_supply_chain_subgraph(env: dict, df_edges: pd.DataFrame, df_nodes: pd.DataFrame, target_node: str, path: str):
+
+    num_stages = env['num_stages']
+    num_agents_per_stage = env['num_agents_per_stage']
+    stage_name_id = dict(zip(env['stage_names'], range(num_stages)))
+    M = nx.DiGraph()
+
+    # Add all nodes to the graph
+    for i in range(len(df_nodes)):
+        if df_nodes['type'][i] == "event":
+            M.add_node(df_nodes['name'][i], type="event")
+        elif df_nodes['type'][i] == "customers":
+            M.add_node(df_nodes['name'][i], type="customers")
+        else:
+            M.add_node(df_nodes['name'][i], type=num_stages-1-stage_name_id[df_nodes['type'][i]])
+
+    # Add edges to the graph if
+    # supply relation nodes
+    # the deliverying and ordering between the target and its downstream/upstream
+    for i in range(len(df_edges)):
+        source = df_edges['src_name'][i]
+        target = df_edges['dst_name'][i]
+        label = df_edges['edge_attr'][i]
+        M.add_edge(source, target, label=label)
+
+
+    # Define positions for the multipartite layout
+    pos = nx.multipartite_layout(M, subset_key="type")
+    edge_labels = nx.get_edge_attributes(M, "label") # Get edge labels
+    # Draw the multipartite graph
+    # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
+    stage_colors = {0: "gold", 1: "violet", 2: "limegreen", 3:"darkorange", "event": "blue", "customers": "red"}
+    colors = [stage_colors[m.get("type")] for m in M.nodes.values()]
+
+
+    plt.figure(figsize=(15, 12))
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=1000, font_size=12, edge_color="gray", alpha=1)
+    nx.draw_networkx_edge_labels(M, pos, edge_labels=edge_labels, font_size=10)
+    # plt.show()
+    plt.savefig(path)
+    plt.close()

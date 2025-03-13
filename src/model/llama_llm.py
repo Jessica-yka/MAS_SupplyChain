@@ -56,11 +56,10 @@ class LLM(torch.nn.Module):
             args.llm_model_path,
             quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
             device_map="auto",              # Automatically map the model to GPU(s)
-            torch_dtype=torch.float32,      # Use float32 for model weights
-            low_cpu_mem_usage=True,         # Use less CPU memory
-            max_memory=kwargs['max_memory'],  # Limit memory usage to 20GiB per GPU)
+            max_memory=kwargs["max_memory"],  # Set the maximum memory for each device
+            revision=kwargs["revision"],  # Use the main revision of the model
         )
-
+        self.prompting_tech = args.prompting_tech
 
         if args.llm_frozen == 'True':
             print("Freezing LLAMA!")

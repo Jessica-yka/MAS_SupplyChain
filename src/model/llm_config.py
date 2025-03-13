@@ -34,7 +34,7 @@ def parse_args_llama():
     parser.add_argument("--skip_training", action='store_true')
 
     # Learning Rate Scheduler
-    parser.add_argument("--num_epochs", type=int, default=20)
+    parser.add_argument("--num_epochs", type=int, default=15)
     parser.add_argument("--warmup_epochs", type=float, default=1)
 
     # Inference
@@ -46,6 +46,7 @@ def parse_args_llama():
     parser.add_argument("--llm_frozen", type=str, default='True')
     parser.add_argument("--llm_num_virtual_tokens", type=int, default=10)
     parser.add_argument("--output_dir", type=str, default='output')
+    parser.add_argument("--prompting_tech", type=str, default='cot')
     parser.add_argument("--max_txt_len", type=int, default=512)
     parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--max_memory", type=csv_list, default=[20,20])

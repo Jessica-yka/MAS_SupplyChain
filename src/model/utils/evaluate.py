@@ -16,10 +16,12 @@ def get_accuracy_gqa(path):
 
 def get_accuracy_sc_qa(path):
     df = pd.read_json(path, lines=True)
+    df["pred"] = df["pred"].astype(str)
+    df["label"] = df["label"].astype(str)
     # compute accuracy
     correct = 0
     for pred, label in zip(df["pred"], df["label"]):
-        if label in pred:
+        if str(label) in str(pred):
             correct += 1
     return correct / len(df)
 

@@ -32,11 +32,11 @@ env_configs_list = {
         "holding_costs_dist": {"dist": "constant", "mean": 10}, 
         "backlog_costs_dist": {'dist': "constant", "mean": 5}, 
         "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 
-        "llm_agents": [(1, 1)],
+        "llm_agents": [(3, 1)],
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
-        "env_no_backlog": True, 
+        "env_no_backlog": False, 
         "emergent_events": {0: {"events": ["earthquake"], 'affected_agents': [[(2, 10)]]},
                             }, 
 

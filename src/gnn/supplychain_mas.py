@@ -19,13 +19,15 @@ cached_desc = f'{PATH}/cached_desc'
 
 
 class SupplyChainMASDataset(Dataset):
-    def __init__(self, event_dataset: str=None, supplier_dataset: str=None, price_dataset: str=None, lead_time_dataset: str=None):
+    def __init__(self, event_dataset: str=None, supplier_dataset: str=None, price_dataset: str=None, lead_time_dataset: str=None, cot: bool = False):
         super().__init__()
 
         self.use_event = False
         self.use_supplier = False
         self.use_price = False
         self.use_lead_time = False
+        if cot:
+            self.cot = "Let's think step by step."
         if event_dataset: 
             self.event_text = pd.read_csv(f'{PATH}/{event_dataset}')
             self.num_data = len(self.event_text)
@@ -134,7 +136,9 @@ class SupplyChainMASDataset(Dataset):
         
         intro = price_out['question'][0].split('. ')[0]
         prompt = (intro + '. '
-                  f"Question: Considering the price and lead time of the upstream agents, who you would choose as your supplier in the next round? Answer the node id of your choice and provide some reasons.\n\n")
+                  f"Question: Considering the price and lead time of the upstream agents, who you would choose as your supplier in the next round? Answer the node id of your choice. "
+                  f"{self.cot}\n\n"
+                  )
         label = None
         data_index = lead_time_out['id'][0]
         graph = torch.load(f'{cached_graph}/{data_index}.pt')

@@ -11,10 +11,11 @@ import numpy as np
 from gymnasium import spaces
 from ray.rllib.env.multi_agent_env import MultiAgentEnv
 import sys
-sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
-from src.model.config import env_configs_list, get_env_configs
-from src.model.utils.utils import visualize_state, parse_stage_agent_id, clear_dir
-from src.model.data_simulation import generate_sup_dem_relations
+# sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
+sys.path.append('src/model')
+from .config import env_configs_list, get_env_configs
+from .utils.utils import visualize_state, parse_stage_agent_id, clear_dir
+from .data_simulation import generate_sup_dem_relations
 import os
 import copy
 # from sc_graph import create_agent_profiles, SupplyChain_Graph
@@ -83,7 +84,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         assert np.min(lead_times) >= 0, "The lead times should be non-negative."
         assert len(prod_capacities) == num_stages * num_agents_per_stage, "The number of production capacities should be the total number of agents in the environment."
         assert np.min(prod_capacities) > 0, "The production capacities should be positive."
-        assert len(sale_prices) == num_stages * num_agents_per_stage, "The number of unit sale prices should be the total number of agents in the environment."
+        assert len(sale_prices) == num_stages * num_agents_per_stage, f"The number of unit sale prices should be the total number of agents in the environment, now it is {len(sale_prices)}"
         assert np.min(sale_prices) >= 0, "The unit sale prices should be non-negative."
         assert len(order_costs) == num_stages * num_agents_per_stage, "The number of unit order costs should be the total number of agents in the environment."
         assert np.min(order_costs) >= 0, "The unit order costs should be non-negative."
@@ -551,7 +552,7 @@ def env_creator(env_config):
 
 if __name__ == '__main__':
 
-    config_name = 'large_graph_test'
+    config_name = 'graph_4_4'
     # create the dir to store the results
     os.makedirs(f"results/{config_name}", exist_ok=True)
     clear_dir(f"results/{config_name}")
@@ -565,8 +566,8 @@ if __name__ == '__main__':
     print(f"stage_names = {im_env.stage_names}")
     print(f"state_dict = {im_env.state_dict}")
     print(f"state_dict = {im_env.parse_state(im_env.state_dict)}")
-    print(f"observation_space = {im_env.observation_space}")
-    print(f"observation_sample = {im_env.observation_space.sample()}")
+    # print(f"observation_space = {im_env.observation_space}")
+    # print(f"observation_sample = {im_env.observation_space.sample()}")
     print(f"action_order_space = {im_env.action_order_space}")
     print(f"action_order_sample = {im_env.action_order_space.sample()}")
     print(f"action_supply_space = {im_env.action_supply_space}")
@@ -580,22 +581,21 @@ if __name__ == '__main__':
         sup_dict = {}
         dem_dict = {}
         supply_relations, demand_relations = generate_sup_dem_relations(type=env_configs_list[config_name]["sup_dem_relation_type"], \
-                                                                        num_customers=env_configs_list[config_name]["num_init_customers"], num_suppliers=env_configs[config_name]["num_init_suppliers"], \
+                                                                        num_customers=env_configs_list[config_name]["num_init_customers"], num_suppliers=env_configs_list[config_name]["num_init_suppliers"], \
                                                                         num_stages=im_env.num_stages, num_agents_per_stage=im_env.num_agents_per_stage)
         for m in range(im_env.num_stages):
             for x in range(im_env.num_agents_per_stage):
-                if m == 0: # retailer
-                    sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
-                    dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
-                elif m == im_env.num_stages - 1: # manufacturer
-                    sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
-                    dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
-                else:
-                    sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
-                    dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
+                sup_dict[f"stage_{m}_agent_{x}"] = supply_relations[m][x]
+                dem_dict[f"stage_{m}_agent_{x}"] = demand_relations[m][x]
+       
+        price_dict = {}
+        for m in range(im_env.num_stages):
+            for x in range(im_env.num_agents_per_stage):
+                price_dict[f"stage_{m}_agent_{x}"] = im_env.init_sale_prices[m][x]
 
         next_state_dict, rewards, terminations, truncations, infos = im_env.step(
             order_dict={f"stage_{m}_agent_{x}": np.array([4 for _ in range(num_agents_per_stage)]) for m in range(im_env.num_stages) for x in range(im_env.num_agents_per_stage)}, 
+            price_dict=price_dict,
             sup_dict=sup_dict,
             dem_dict=dem_dict
         )
@@ -607,6 +607,6 @@ if __name__ == '__main__':
         # print(f"truncations = {truncations}")
         # print(f"infos = {infos}")
         visualize_state(env=im_env, rewards=rewards, t=t, save_prefix=config_name)
-        if np.any(im_env.backlogs[1:, :, t]< 0) :
-            print("backlogs become negative")
-            break
+        # if np.any(im_env.backlogs[1:, :, t]< 0) :
+        #     print("backlogs become negative")
+        #     break

@@ -120,16 +120,16 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
 
     # Draw the multipartite graph
     # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
-    stage_colors = ["gold", "violet", "limegreen", "darkorange", "black"]
-    colors = [stage_colors[m] for m in range(num_stages) for x in range(num_agents_per_stage)]
+    stage_colors = ["gold", "violet", "limegreen", "darkorange", "red", "green", "black"]
+    colors = [stage_colors[m] for m in range(num_stages) for _ in range(num_agents_per_stage)]
     # mask closed agents
     for m in range(num_stages):
         for x in range(num_agents_per_stage):
             if env.running_agents[m][x] == 0:
                 colors[m*num_agents_per_stage+x] = "black"
 
-    plt.figure(figsize=(25, 20))
-    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=100, font_size=12, edge_color="gray", alpha=1)
+    plt.figure(figsize=(15, 10))
+    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=200, font_size=12, edge_color="gray", alpha=1)
     plt.title("Multipartite Graph")
     plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="jpg")
 
@@ -236,8 +236,9 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
     df = df.groupby(by=['stage', 'agent_idx']).apply(lambda x: x).reset_index(drop=True)
     os.makedirs(save_path, exist_ok=True)
     df.to_csv(os.path.join(save_path, f"env_period_{t}.csv"), index=False)
+    df.to_json(os.path.join(save_path, f"env_period_{t}.json"), orient='records', lines=True)
     draw_multipartite_graph(env=env, t=t, save_prefix=save_prefix)
-    draw_material_flow(env=env, t=t, save_prefix=save_prefix)
+    # draw_material_flow(env=env, t=t, save_prefix=save_prefix)
 
 def random_relations(n_cand: int, n_relation: int):
 

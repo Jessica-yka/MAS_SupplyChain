@@ -26,7 +26,7 @@ from src.model.data_simulation import generate_cost_price, generate_sup_dem_rela
 from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
 from src.model.data_simulation import Demand_fn
 from utils.retrieval import get_demand_sub_df_edges, get_event_sub_df_edges, get_lt_sub_df_edges, get_price_sub_df_edges, get_of_sub_df_edges, get_sub_df_nodes
-from utils.utils import visualize_contextualized_supply_chain_subgraph, rank_suppliers_by_reliability
+from utils.utils import rank_suppliers_by_reliability
 import matplotlib.pyplot as plt
 import networkx as nx
 import random
@@ -37,9 +37,11 @@ from scipy.stats import rankdata
 from concurrent.futures import ThreadPoolExecutor
 from utils.utils import save_graph_to_json, save_env_to_json
 import random
-
+import argparse
 np.random.seed(2025)
 
+parser = argparse.ArgumentParser()
+parser.add_argument('--for_train', action='store_true', default=False)
 # Define the list of events with simplified descriptions
 events = [
     ["Event", "Effect Type", "Affected Aspect"],
@@ -160,21 +162,21 @@ def convert_env_to_node_df(env: dict):
     num_agents_per_stage = env['num_agents_per_stage']
     stage_names = env['stage_names']
     num_current_events = len(env['events'])
-    num_nodes = num_stages * num_agents_per_stage + num_current_events
+    num_nodes = 1 + num_stages * num_agents_per_stage + num_current_events
     df_node = pd.DataFrame(index=range(num_nodes), columns=["node_id", "type"])
     df_node["node_id"] = np.arange(num_nodes).tolist()
-    df_node["name"] = [f"stage_{m}_agent_{x}" for m in range(num_stages) for x in range(num_agents_per_stage)] + [event_dict['events'][eidx] for eidx in env['events'].keys()]
-    df_node["type"] = [stage_names[m] for m in range(num_stages) for x in range(num_agents_per_stage)] + ["event" for _ in range(num_current_events)]
-    df_node['sale_price'] = env['sale_prices'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['prod_capacity'] = env['prod_capacities'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['prod_cost'] = env['prod_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['holding_cost'] = env['holding_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['backlog_cost'] = env['backlog_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['inventory'] = env['inventories'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['backlog'] = env['backlog'].flatten().tolist() + [0 for _ in range(num_current_events)]
-    df_node['upstream_backlog'] = [0 for _ in range(num_stages*num_agents_per_stage)] + [0 for _ in range(num_current_events)]
-    df_node['stage_id'] = [m for m in range(num_stages) for _ in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
-    df_node['agent_id'] = [x for _ in range(num_stages) for x in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
+    df_node["name"] = ["Customers"]+[f"stage_{m}_agent_{x}" for m in range(num_stages) for x in range(num_agents_per_stage)] + [event_dict['events'][eidx] for eidx in env['events'].keys()]
+    df_node["type"] = ["customers"]+[stage_names[m] for m in range(num_stages) for x in range(num_agents_per_stage)] + ["event" for _ in range(num_current_events)]
+    df_node['sale_price'] = [0] + env['sale_prices'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['prod_capacity'] = [0] + env['prod_capacities'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['prod_cost'] = [0] + env['prod_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['holding_cost'] = [0] + env['holding_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['backlog_cost'] = [0] + env['backlog_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['inventory'] = [0] + env['inventories'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['backlog'] = [0] + env['backlog'].flatten().tolist() + [0 for _ in range(num_current_events)]
+    df_node['upstream_backlog'] = [0] + [0 for _ in range(num_stages*num_agents_per_stage)] + [0 for _ in range(num_current_events)]
+    df_node['stage_id'] = [-1] + [m for m in range(num_stages) for _ in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
+    df_node['agent_id'] = [-1] + [x for _ in range(num_stages) for x in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
     
     return df_node
 
@@ -202,8 +204,16 @@ def convert_env_to_edge_df(env: dict, event_dict: dict):
                         [f"stage_{m}_agent_{x}", f"stage_{m+1}_agent_{i}", f"request order of {num_request_order} units of product at round {t-1}", "", []]
                     env['requested_order'][m+1][i] += num_request_order
                     df_edge.loc[edge_idx+1, ["source", "target", "label", 'type', 'aspect']] = \
-                        [f"stage_{m+1}_agent_{i}", f"stage_{m}_agent_{x}", f"deliverying {num_fufilled_order} units of product at round {t}", is_fulfilled, ['Order Fulfillment']]
+                        [f"stage_{m+1}_agent_{i}", f"stage_{m}_agent_{x}", f"deliverying {num_fufilled_order} units of product at round {t}", is_fulfilled, []]
                     edge_idx += 2
+
+    # Create downstream demand for retailers
+    for x in range(num_agents_per_stage):
+        num_request_order = env['demand_fn'](t)
+        df_edge.loc[edge_idx, ["source", "target", "label", "type", 'aspect']] = \
+            [f"Customers", f"stage_0_agent_{x}", f"have a demand for {num_request_order} units of product at round {t-1}", "", []]
+        env['requested_order'][0][x] += num_request_order
+        edge_idx += 1
 
     # Keep the record of the other events
     for eidx in env['events'].keys():
@@ -233,10 +243,10 @@ def convert_env_to_edge_df(env: dict, event_dict: dict):
     # add lead time info to the edge_df
     for stage_id in range(num_stages-1):
         for agent_id in range(num_agents_per_stage):
-            for taget_agent_id in range(num_agents_per_stage):
-                lt = env['lead_times'][stage_id][agent_id][i]
+            for target_agent_id in range(num_agents_per_stage):
+                lt = env['lead_times'][stage_id][agent_id][target_agent_id]
                 df_edge.loc[edge_idx, ["source", "target", "label", "type", "aspect"]] = \
-                        [f"stage_{stage_id+1}_agent_{taget_agent_id}", f"stage_{stage_id}_agent_{agent_id}", f"has lead time of {lt} days to", "", []]
+                        [f"stage_{stage_id+1}_agent_{target_agent_id}", f"stage_{stage_id}_agent_{agent_id}", f"has lead time of {lt} days to", "", []]
                 edge_idx += 1
 
     # add potential suppliers info to the edge_df
@@ -375,7 +385,7 @@ def generate_event_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
     # remove price from the aspect list
     questions = []
     answers = []
-    target_nodes = []
+    cur_target_nodes = []
 
     n_cum_questions = 0
     while n_cum_questions < num_questions:
@@ -428,11 +438,12 @@ def generate_event_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
             # Save the target-node-related graph as node df/edge df/graph/graph img
             df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
             df_simp_edges = get_event_sub_df_edges(G=G, df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
-            visualize_contextualized_supply_chain_subgraph(env=env, event_dict=event_dict, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
-            df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-            df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
-            # df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-            # df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+            # visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
+            # df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+            # df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+
+            df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+            df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
             save_env_to_json(env, f"{save_env_path}/{data_idx+n_cum_questions}.json")
             save_graph_to_json(G, f"{save_G_path}/{data_idx+n_cum_questions}.json")
         except:
@@ -440,11 +451,11 @@ def generate_event_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
 
         questions.append(question)
         answers.append(answer)
-        target_nodes.append(target_node)
+        cur_target_nodes.append(target_node)
         n_cum_questions += 1
 
 
-    return questions, answers, target_nodes
+    return questions, answers, cur_target_nodes
 
 
 def generate_price_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env: dict, data_idx: int, target_nodes: list=None, num_questions: int=10):
@@ -454,6 +465,7 @@ def generate_price_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
     t = env['t']
     questions = []
     answers = []
+    cur_target_nodes = []
     n_cum_questions = 0
 
     while n_cum_questions < num_questions:
@@ -467,30 +479,33 @@ def generate_price_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
             target_node_stage_id = int(target_node_stage_id)
             target_node_agent_id = int(target_node_agent_id)
 
+        cur_target_nodes.append(target_node)
         question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, which of the upstream agents at stage {target_node_stage_id+1} offer the lowerest price? Answer with the node id, e.g. 15."
         
-        if for_train:
-            answer_agent_id = np.argmin(env['sale_prices'][(target_node_stage_id+1)*num_agents_per_stage:(target_node_stage_id+2)*num_agents_per_stage])
-        else:
+        if target_node_stage_id == num_stages-1: # in test set, it is possible that the target node is the last stage
             answer_agent_id = 0
-        # answer = f"stage_{target_node_stage_id+1}_agent_{answer_agent_id}"
-        answer = int((target_node_stage_id+1)*num_agents_per_stage + answer_agent_id)
+            # answer_agent_id = np.argmin(env['sale_prices'][(target_node_stage_id+1)*num_agents_per_stage:])
+        else:
+            answer_agent_id = np.argmin(env['sale_prices'][(target_node_stage_id+1)*num_agents_per_stage:(target_node_stage_id+2)*num_agents_per_stage])
+
+        answer = str(node_name_id_map[f"stage_{target_node_stage_id+1}_agent_{answer_agent_id}"])
 
         # Save the target-node-related graph as node df/edge df/graph/graph img
-        df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
-        df_simp_edges = get_price_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
-        visualize_contextualized_supply_chain_subgraph(env=env, event_dict=event_dict, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
-        df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
+        # df_simp_edges = get_price_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
+        # visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
+        # df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+
+        df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
         save_env_to_json(env, f"{save_env_path}/{data_idx+n_cum_questions}.json")
         save_graph_to_json(G, f"{save_G_path}/{data_idx+n_cum_questions}.json")
         questions.append(question)
         answers.append(answer)
         n_cum_questions += 1
 
-    return questions, answers
+    return questions, answers, cur_target_nodes
 
 
 def generate_lead_time_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env: dict, data_idx: int, target_nodes: list=None, num_questions: int=10):
@@ -501,6 +516,7 @@ def generate_lead_time_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame,
     questions = []
     answers = []
     n_cum_questions = 0
+    cur_target_nodes = []
 
     while n_cum_questions < num_questions:
         if target_nodes is None:
@@ -513,30 +529,33 @@ def generate_lead_time_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame,
             target_node_stage_id = int(target_node_stage_id)
             target_node_agent_id = int(target_node_agent_id)
 
+        
         question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, which of the upstream agents at stage {target_node_stage_id+1} has the shortest lead time? Answer with the node id, e.g. 17."
-        if for_train:
-            answer_agent_id = np.argmin(env['lead_times'][target_node_stage_id][target_node_agent_id])
-        else:
+        if target_node_stage_id == num_stages-1: # in test set, it is possible that the target node is the last stage
             answer_agent_id = 0
-        # answer = f"stage_{target_node_stage_id+1}_agent_{answer_agent_id}"
-        answer = int((target_node_stage_id+1)*num_agents_per_stage + answer_agent_id)
+        else:
+            answer_agent_id = np.argmin(env['lead_times'][target_node_stage_id][target_node_agent_id])
+
+        answer = node_name_id_map[f"stage_{target_node_stage_id+1}_agent_{answer_agent_id}"]
 
         # Save the target-node-related graph as node df/edge df/graph/graph img
-        df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
-        df_simp_edges = get_lt_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
-        visualize_contextualized_supply_chain_subgraph(env=env, event_dict=event_dict, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
-        df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
+        # df_simp_edges = get_lt_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
+        # visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
+        # df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+
+        df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
         save_env_to_json(env, f"{save_env_path}/{data_idx+n_cum_questions}.json")
         save_graph_to_json(G, f"{save_G_path}/{data_idx+n_cum_questions}.json")
         
         questions.append(question)
         answers.append(answer)
+        cur_target_nodes.append(target_node)
         n_cum_questions += 1
 
-    return questions, answers
+    return questions, answers, cur_target_nodes
 
 def generate_orderFulfill_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env:dict, data_idx:int, target_nodes: list=None, num_questions: int=5):
 
@@ -546,6 +565,7 @@ def generate_orderFulfill_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFra
     questions = []
     answers = []
     n_cum_questions = 0
+    cur_target_nodes = []
 
     while n_cum_questions < num_questions:
         if target_nodes is None:
@@ -558,26 +578,32 @@ def generate_orderFulfill_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFra
             target_node_stage_id = int(target_node_stage_id)
             target_node_agent_id = int(target_node_agent_id)
 
+        
         supp_node_agent_id = np.argmax(env['supply_relations'][target_node_stage_id][target_node_agent_id])
         question = f"Your are {target_node} at round {t}. Considering the provided supply chain graph, is your supplier stage_{target_node_stage_id+1}_agent_{supp_node_agent_id} meeting the order fulfillment by delivering the full requested amount of products in your order at round {t-1}? Please answer with either 'yes' or 'no'."
-        answer = "yes" if env['order_fulfill_rates'][target_node_stage_id+1][supp_node_agent_id][target_node_agent_id] == 1 else "no"
+        if target_node_stage_id < num_stages - 1:
+            answer = "yes" if env['order_fulfill_rates'][target_node_stage_id+1][supp_node_agent_id][target_node_agent_id] == 1 else "no"
+        else:
+            answer = "None"
 
         # Save the target-node-related graph as node df/edge df/graph/graph img
-        df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
-        df_simp_edges = get_of_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
-        visualize_contextualized_supply_chain_subgraph(env=env, event_dict=event_dict, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
-        df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
+        # df_simp_edges = get_of_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
+        # visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
+        # df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+
+        df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
         save_env_to_json(env, f"{save_env_path}/{data_idx+n_cum_questions}.json")
         save_graph_to_json(G, f"{save_G_path}/{data_idx+n_cum_questions}.json")
         
         questions.append(question)
         answers.append(answer)
+        cur_target_nodes.append(target_node)
         n_cum_questions += 1
 
-    return questions, answers
+    return questions, answers, cur_target_nodes
 
 
 def generate_demand_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env:dict, data_idx: int, target_nodes: list=None, num_questions: int=5):
@@ -587,11 +613,12 @@ def generate_demand_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, en
     t = env['t']
     questions = []
     answers = []
+    cur_target_nodes = []
     n_cum_questions = 0
 
     while n_cum_questions < num_questions:
         if target_nodes is None:
-            target_node_stage_id = random.choice(range(1, num_stages))
+            target_node_stage_id = random.choice(range(num_stages))
             target_node_agent_id = random.choice(range(num_agents_per_stage))
             target_node = f"stage_{target_node_stage_id}_agent_{target_node_agent_id}"
         else:
@@ -600,28 +627,34 @@ def generate_demand_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, en
             target_node_stage_id = int(target_node_stage_id)
             target_node_agent_id = int(target_node_agent_id)
 
-        question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the requested order at round {t}? Answer with either 'yes' or 'no'."
+        
+        if target_node_stage_id == 0:
+            question = f"Your are {target_node} at round {t-1}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the downstream demand at round {t-1}? Answer with either 'yes' or 'no'."
+        else:
+            question = f"Your are {target_node} at round {t-1}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the requested order at round {t-1}? Answer with either 'yes' or 'no'."
         if env['requested_order'][target_node_stage_id][target_node_agent_id] <= env['inventories'][target_node_stage_id*num_agents_per_stage+target_node_agent_id]:
             answer = "yes"
         else:
             answer = 'no'
 
         # Save the target-node-related graph as node df/edge df/graph/graph img
-        df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
-        df_simp_edges = get_demand_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
-        visualize_contextualized_supply_chain_subgraph(env=env, event_dict=event_dict, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
-        df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
+        # df_simp_edges = get_demand_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
+        # visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
+        # df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        # df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
+
+        df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
+        df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
         save_env_to_json(env, f"{save_env_path}/{data_idx+n_cum_questions}.json")
         save_graph_to_json(G, f"{save_G_path}/{data_idx+n_cum_questions}.json")
         
         questions.append(question)
         answers.append(answer)
+        cur_target_nodes.append(target_node)
         n_cum_questions += 1
 
-    return questions, answers
+    return questions, answers, cur_target_nodes
 
 
 if __name__ == "__main__":
@@ -633,7 +666,9 @@ if __name__ == "__main__":
                 "Aspect": [x[2] for x in events_list[1:]]}
     num_events = len(event_dict['events'])
 
-    for_train = True
+    args = parser.parse_args()
+    for_train = args.for_train
+
     data_type = "train" if for_train else "test"
     env_config_name = "graph_4_4"
     save_path = f"src/gnn/gnn_dataset"
@@ -650,17 +685,17 @@ if __name__ == "__main__":
     save_env_path = f"{save_path}/{env_config_name}/{data_type}_data/envs"
     save_G_path = f"{save_path}/{env_config_name}/{data_type}_data/G"
     os.makedirs(save_node_path, exist_ok=True)
-    # clear_dir(save_node_path)
+    clear_dir(save_node_path)
     os.makedirs(save_edge_path, exist_ok=True)
-    # clear_dir(save_edge_path)
+    clear_dir(save_edge_path)
     os.makedirs(save_graph_path, exist_ok=True)
-    # clear_dir(save_graph_path)
+    clear_dir(save_graph_path)
     os.makedirs(save_graph_img_path, exist_ok=True)
-    # clear_dir(save_graph_img_path)
+    clear_dir(save_graph_img_path)
     os.makedirs(save_env_path, exist_ok=True)
-    # clear_dir(save_env_path)
+    clear_dir(save_env_path)
     os.makedirs(save_G_path, exist_ok=True)
-    # clear_dir(save_G_path)
+    clear_dir(save_G_path)
 
     df_event_qa = pd.DataFrame({"question": [], "label": []})
     df_price_qa = pd.DataFrame({"question": [], "label": []})
@@ -688,52 +723,67 @@ if __name__ == "__main__":
         events = assign_events(num_events, num_stages, num_agents_per_stage)
         env['events'] = events
         df_nodes = convert_env_to_node_df(env=env)
+        node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
         df_edges = convert_env_to_edge_df(env=env, event_dict=event_dict)
 
         G = build_supplier_graph(df_edges=df_edges, df_nodes=df_nodes)
         target_nodes = None
         if create_event_questions:
             # print("generate event questions")
-            if for_train:
-                questions, answers, _ = generate_event_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, data_idx=data_idx, num_questions=num_questions_per_graph)
-            else:
-                questions, answers, target_nodes = generate_event_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
+            questions, answers, target_nodes = generate_event_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, data_idx=data_idx)
             df_event_qa = pd.concat([df_event_qa, pd.DataFrame({"question": questions, 
                                                                 "label": answers, 
-                                                                'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
+                                                                'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph),
+                                                                "target_node": target_nodes})], axis=0)
             
         data_idx += num_questions_per_graph
 
         if create_price_questions:
             # print("generate price questions")
-            questions, answers = generate_price_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
+            if for_train:
+                questions, answers, target_nodes = generate_price_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=None, data_idx=data_idx)
+            else:
+                questions, answers, _ = generate_price_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
             df_price_qa = pd.concat([df_price_qa, pd.DataFrame({"question": questions, 
                                                                 "label": answers, 
-                                                                'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
+                                                                'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph),
+                                                                "target_node": target_nodes})], axis=0)
         data_idx += num_questions_per_graph
 
         if create_lead_time_questions:
             # print("generate lead time questions")
-            questions, answers = generate_lead_time_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
+            if for_train:
+                questions, answers, target_nodes = generate_lead_time_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=None, data_idx=data_idx)
+            else:
+                questions, answers, _ = generate_lead_time_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
             df_lead_time_qa = pd.concat([df_lead_time_qa, pd.DataFrame({"question": questions, 
                                                                         "label": answers, 
-                                                                        'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
+                                                                        'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph),
+                                                                        "target_node": target_nodes})], axis=0)
         data_idx += num_questions_per_graph
 
         if create_order_fulfill_questions:
             # print("generate supplier questions")
-            questions, answers = generate_orderFulfill_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
+            if for_train:
+                questions, answers, target_nodes = generate_orderFulfill_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=None, data_idx=data_idx)
+            else:
+                questions, answers, _ = generate_orderFulfill_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
             df_order_fulfill_qa = pd.concat([df_order_fulfill_qa, pd.DataFrame({"question": questions,
                                                                                 "label": answers,
-                                                                                'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
+                                                                                'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph),
+                                                                                "target_node": target_nodes})], axis=0)
         data_idx += num_questions_per_graph
 
         if create_demand_questions:
             # print("generate demand questions")
-            questions, answers = generate_demand_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
+            if for_train:
+                questions, answers, target_nodes = generate_demand_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=None, data_idx=data_idx)
+            else:
+                questions, answers, _ = generate_demand_questions(df_nodes=df_nodes, df_edges=df_edges, env=env, num_questions=num_questions_per_graph, target_nodes=target_nodes, data_idx=data_idx)
             df_demand_qa = pd.concat([df_demand_qa, pd.DataFrame({"question": questions,
                                                                     "label": answers,
-                                                                    'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph)})], axis=0)
+                                                                    'graph_idx': np.arange(data_idx, data_idx+num_questions_per_graph),
+                                                                    "target_node": target_nodes})], axis=0)
         data_idx += num_questions_per_graph
 
         if not for_train:

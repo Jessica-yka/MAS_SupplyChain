@@ -9,8 +9,11 @@ from random import random
 
 def generate_lead_time(dist: dict, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
     # To generate lead time for each agent
+    data = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int)
     if dist['dist'] == 'uniform':
-        data = np.random.uniform(low=dist['lb'], high=dist['ub'], size=(num_stages, num_agents_per_stage, num_agents_per_stage)).astype(int)
+        for m in range(num_stages):
+            for x in range(num_agents_per_stage):
+                data[m, x, :] = np.random.choice(range(dist['lb'], dist['ub']), num_agents_per_stage, replace=False)
     elif dist['dist'] == "constant":
         mean = dist['mean']
         data = [mean for _ in range(num_stages * num_agents_per_stage * num_agents_per_stage)]
@@ -108,23 +111,19 @@ def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage:
             for x in range(num_agents_per_stage):
                 if m == 0: 
                     supply_relations[m][x][x] = 1
-                    demand_relations[m][x][0] = 1
+                    demand_relations[m][x][x] = 1
                 elif m == num_stages-1: 
-                    supply_relations[m][x][0] = 1
+                    supply_relations[m][x][x] = 1
                 else:
                     supply_relations[m][x][x] = 1
     elif type == "random":
         for m in range(num_stages):
             for x in range(num_agents_per_stage):
                 if m == 0:
-                    suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
-                    supply_relations[m][x][suppliers_idx] = 1
-                    demand_relations[m][x][0] = 1
-                elif m == num_stages-1:
-                    supply_relations[m][x][0] = 1
-                else:
-                    suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
-                    supply_relations[m][x][suppliers_idx] = 1
+                    demand_relations[m][x][x] = 1
+                    
+                suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
+                supply_relations[m][x][suppliers_idx] = 1
     else:
         raise AssertionError(f"{type} relation function is not implemented.")
     
