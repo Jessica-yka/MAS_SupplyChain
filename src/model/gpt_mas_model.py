@@ -11,6 +11,7 @@ from .llm_config import llm_config_list
 from .utils.utils import extract_pairs
 from .form_msg import generate_msg
 from .utils.utils import visualize_state, save_string_to_file, update_sup_action
+from .utils.utils import read_data_from_json, save_data_to_json
 
 np.random.seed(0)
 
@@ -56,6 +57,25 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
     enable_price_change = im_env.enable_price_change
     visualize_state(env=im_env, rewards={}, t=-1, save_prefix=config_name)
     
+    run_period_simulation()
+
+    print(
+        f"episode_reward = {episode_reward}"
+    )
+    print(f"api_cost = {api_cost}")
+    print('=' * 80)
+        
+    return episode_reward
+
+
+def run_period_simulation(im_env, user_proxy, stage_agents, config_name, period):
+    all_action_order_dicts = read_data_from_json("all_action_order_dicts.json")
+    all_action_sup_dicts = read_data_from_json("all_action_sup_dicts.json")
+    all_action_dem_dicts = read_data_from_json("all_action_dem_dicts.json")
+    all_action_price_dicts = read_data_from_json("all_action_price_dicts.json")
+    all_reward_dicts = read_data_from_json("all_reward_dicts.json")
+    all_state_dicts = read_data_from_json("all_state_dicts.json")
+
     for period in range(im_env.num_periods):
         # retrieve the latest env info
         state_dict = im_env.parse_state(im_env.state_dict)
@@ -73,6 +93,11 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         action_dem_dict = {}
         total_chat_summary = ""
         emergent_events = im_env.emergent_events.get(period, {'events': [], 'affected_agents': []})
+        num_stages = im_env.num_stages
+        num_agents_per_stage = im_env.num_agents_per_stage
+        llm_agent_set = im_env.llm_agent_set
+        enable_graph_change = im_env.enable_graph_change
+        enable_price_change = im_env.enable_price_change
         for event in emergent_events['events']:
             pass
             # if event == "demand_surge":
@@ -213,11 +238,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         )
         visualize_state(env=im_env, rewards=rewards, t=period, save_prefix=config_name)
         save_string_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=round_reward_sum)
-
-    print(
-        f"episode_reward = {episode_reward}"
-    )
-    print(f"api_cost = {api_cost}")
-    print('=' * 80)
         
-    return episode_reward
+        save_data_to_json(all_state_dicts, "all_state_dicts.json")
+        save_data_to_json(all_action_order_dicts, "all_action_order_dicts.json")
+        save_data_to_json(all_action_sup_dicts, "all_action_sup_dicts.json")
