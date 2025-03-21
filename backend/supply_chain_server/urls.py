@@ -16,10 +16,47 @@ Including another URLconf
 """
 
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, re_path
+from django.views.static import serve
+from django.views.generic import TemplateView
+from django.conf import settings
+from django.http import JsonResponse, HttpResponse
 from . import views
+import json
+import os
+
+def serve_json_file(request, path):
+    try:
+        # 尝试从 dist/test_data 目录读取
+        json_path = settings.BASE_DIR / 'dist' / 'test_data' / path
+        if not os.path.exists(json_path):
+            return JsonResponse({'error': f'File not found: {path}'}, status=404)
+            
+        with open(json_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        return JsonResponse(data, safe=False)
+    except json.JSONDecodeError:
+        return JsonResponse({'error': 'Invalid JSON file'}, status=500)
+    except Exception as e:
+        return JsonResponse({'error': str(e)}, status=500)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('hello/', views.hello_world, name='hello_world'),
+    path('print_post/', views.print_post, name='print_post'),
+    path('next_step/', views.next_step, name='next_step'),
+    
+    # 添加数据文件路由（移到静态文件路由前面）
+    re_path(r'^test_data/(?P<path>.*)$', serve_json_file),
+    
+    # 静态文件服务
+    re_path(r'^assets/(?P<path>.*)$', serve, {
+        'document_root': settings.BASE_DIR / 'dist/assets'
+    }),
+    path('', TemplateView.as_view(template_name='index.html')),
+]
+
+# 确保在最后添加通配符路由
+urlpatterns += [
+    re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
 ]
