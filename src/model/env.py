@@ -313,7 +313,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         current_inventories = self.inventories[:, :, t - 1]
         # update supple/demand relations if needed
         if self.enable_graph_change:
-            self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)                                                                                                                                    
+            self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)         
+            self.demand_relations[1:, :, :] = np.transpose(self.supply_relations[:-1, :, :], (0, 2, 1))                                                                                                                          
         self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
@@ -555,7 +556,13 @@ if __name__ == '__main__':
     config_name = 'graph_4_4'
     # create the dir to store the results
     os.makedirs(f"results/{config_name}", exist_ok=True)
-    clear_dir(f"results/{config_name}")
+    os.makedirs(f"results/{config_name}/json_results", exist_ok=True)
+    os.makedirs(f"results/{config_name}/img_results", exist_ok=True)
+    os.makedirs(f"results/{config_name}/df_results", exist_ok=True)
+    
+    clear_dir(f"results/{config_name}/json_results")
+    clear_dir(f"results/{config_name}/img_results")
+    clear_dir(f"results/{config_name}/df_results")
     # create the dir to store the env setup
     os.makedirs(f"env/{config_name}", exist_ok=True)
     clear_dir(f"env/{config_name}")

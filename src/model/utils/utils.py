@@ -131,7 +131,7 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
     plt.figure(figsize=(15, 10))
     nx.draw(M, pos, with_labels=True, node_color=colors, node_size=200, font_size=12, edge_color="gray", alpha=1)
     plt.title("Multipartite Graph")
-    plt.savefig(os.path.join(save_path, f"supply_chain_period_{t}.jpg"), format="jpg")
+    plt.savefig(os.path.join(save_path, "img_results", f"supply_chain_period_{t}.jpg"), format="jpg")
 
 # def draw_multipartite_graph_for_data_geration(, save_prefix: str):
 
@@ -235,10 +235,11 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
     
     df = df.groupby(by=['stage', 'agent_idx']).apply(lambda x: x).reset_index(drop=True)
     os.makedirs(save_path, exist_ok=True)
-    df.to_csv(os.path.join(save_path, f"env_period_{t}.csv"), index=False)
-    df.to_json(os.path.join(save_path, f"env_period_{t}.json"), orient='records', lines=True)
+    df.to_csv(os.path.join(save_path, "df_results", f"env_period_{t}.csv"), index=False)
+    df.to_json(os.path.join(save_path, "json_results", f"env_period_{t}.json"), orient='records', indent=4)
     draw_multipartite_graph(env=env, t=t, save_prefix=save_prefix)
     # draw_material_flow(env=env, t=t, save_prefix=save_prefix)
+    
 
 def random_relations(n_cand: int, n_relation: int):
 
