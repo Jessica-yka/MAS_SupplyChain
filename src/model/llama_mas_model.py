@@ -124,16 +124,14 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
                     question = prompt+thinking_pipeline[0]
                     # edges
                     df_nodes, df_edges = generate_graph_description(emergent_events=t_emergent_events, state=state_dict, past_req_orders=pr_orders, stage_id=stage_id, agent_id=agent_id, num_stages=num_stages, num_agents_per_stage=num_agents_per_stage)
-                    df_nodes.to_csv('df_nodes.csv', index=False)
-                    df_edges.to_csv('df_edges.csv', index=False)
+  
                     
                     subg, desc = encode_mas_supply_chain_graph(question=question, df_nodes=df_nodes, df_edges=df_edges, env_name=config_name)
                     samples = [{"id": f"t{period}s{stage_id}a{agent_id}", "question": question, "desc": desc, 'graph': subg, 'label': None}]
-                    print('question', question)
+
                     output = model.inference(samples=collate_fn(samples))
-                    print(output['pred'])
+
                     # match = re.findall(r'\[(.*?)\]', chat_summary, re.DOTALL)
-                    exit()
                     if enable_graph_change:
                         sup_action = state_dict[f'stage_{stage_id}_agent_{agent_id}']['suppliers']
                         if stage_id < num_stages - 1:

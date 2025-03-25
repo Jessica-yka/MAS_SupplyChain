@@ -7,23 +7,32 @@ from src.model.utils.utils import save_array, extract_pairs
 from src.model.utils.utils import random_relations
 from random import random
 
-def generate_lead_time(dist: dict, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
-    # To generate lead time for each agent
-    data = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int)
-    if dist['dist'] == 'uniform':
-        for m in range(num_stages):
-            for x in range(num_agents_per_stage):
-                data[m, x, :] = np.random.choice(range(dist['lb'], dist['ub']), num_agents_per_stage, replace=False)
-    elif dist['dist'] == "constant":
-        mean = dist['mean']
-        data = [mean for _ in range(num_stages * num_agents_per_stage * num_agents_per_stage)]
-        data = np.array(data).reshape(num_stages, num_agents_per_stage, num_agents_per_stage).astype(int)
-    else:
-        raise AssertionError("Lead time function is not implemented.")
+def generate_xy_locations(num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
+    # To generate x, y locations for each agent
+    data = np.zeros((num_stages, num_agents_per_stage, 2), dtype=int)
+    for m in range(num_stages):
+        for x in range(num_agents_per_stage):
+            data[m, x, 0] = np.random.randint(0, 10)
+            data[m, x, 1] = np.random.randint(0, 10)
+    
+    if save_data:
+        save_array(data, f"env/{config_name}/xy_locations.npy")
+    return data
 
+def generate_lead_time(dist: dict, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
+   
+    xy_locations = generate_xy_locations(num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=config_name, save_data=save_data)
+    data = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int)
+    for stage_id in range(num_stages-1):
+        for agent_id in range(num_agents_per_stage):
+            for supp_id in range(num_agents_per_stage):
+                distance = int(np.linalg.norm(xy_locations[stage_id, agent_id] - xy_locations[stage_id+1, supp_id]))
+                data[stage_id, agent_id, supp_id] = distance
+
+    data = np.maximum(data, 1)
     if save_data:
         save_array(data, f"env/{config_name}/lead_time.npy")
-
+        
     return data
 
 def generate_prod_capacity(dist: dict, num_data: int, config_name: str="test", save_data: bool=True):

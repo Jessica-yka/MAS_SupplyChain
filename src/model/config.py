@@ -32,7 +32,7 @@ env_configs_list = {
         "holding_costs_dist": {"dist": "constant", "mean": 10}, 
         "backlog_costs_dist": {'dist': "constant", "mean": 5}, 
         "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 
-        "llm_agents": [(3, 1)],
+        "llm_agents": [(0, 0)],
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
@@ -73,7 +73,8 @@ def get_env_configs(env_configs: dict):
     # create the dir to store the results
 
     os.makedirs(f"results/{env_config_name}", exist_ok=True)
-    clear_dir(f"results/{env_config_name}")
+    # clear_dir(f"results/{env_config_name}")
+
     # crate the dir to store the env setup
     os.makedirs(f"env/{env_config_name}", exist_ok=True)
     clear_dir(f"env/{env_config_name}")

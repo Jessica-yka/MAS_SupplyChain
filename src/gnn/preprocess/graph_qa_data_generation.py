@@ -45,22 +45,22 @@ parser.add_argument('--for_train', action='store_true', default=False)
 # Define the list of events with simplified descriptions
 events = [
     ["Event", "Effect Type", "Affected Aspect"],
-    ["Earthquakes", "Negative", ["Production Capacity"]],
+    ["Earthquakes", "Negative", ["Production Capacity"]], # display in frontend
     ["Hurricanes", "Negative", ["Delivery Time"]],
     ["Floods", "Negative", ["Order Fulfillment"]],
     ["Wildfires", "Negative", ["Production Capacity"]],
     ["Droughts", "Negative", ["Price"]],
     ["Tsunamis", "Negative", ["Delivery Time"]],
     ["Volcano eruptions", "Negative", ["Delivery Time"]],
-    ["Severe storms", "Negative", ["Delivery Time"]],
+    ["Severe storms", "Negative", ["Delivery Time"]], # display in frontend
     ["Pandemics", "Negative", ["Production Capacity"]],
     ["Factory closures", "Negative", ["Production Capacity"]],
-    ["Workforce absenteeism", "Negative", ["Production Capacity"]],
+    ["Workforce absenteeism", "Negative", ["Production Capacity"]], # display in frontend
     ["Recessions", "Negative", ["Demand"]],
     ["Inflation", "Negative", ["Price"]],
     ["Trade wars", "Negative", ["Price"]],
     ["Economic booms", "Positive", ["Demand"]],
-    ["Wage increases", "Negative", ["Price"]],
+    ["Wage increases", "Negative", ["Price"]], 
     ["Labor strikes", "Negative", ["Production Capacity"]],
     ["Port congestion", "Negative", ["Delivery Time"]],
     ["Fuel shortages", "Negative", ["Delivery Time"]],
@@ -81,8 +81,8 @@ events = [
     ["Automation", "Positive", ["Production Capacity"]],
     ["AI implementation", "Positive", ["Production Capacity"]],
     ["Better forecasting tools", "Positive", ["Order Fulfillment"]],
-    ["Drone delivery", "Positive", ["Delivery Time"]],
-    ["Renewable energy adoption", "Positive", ["Price"]],
+    ["Drone delivery", "Positive", ["Delivery Time"]], 
+    ["Renewable energy adoption", "Positive", ["Price"]], # display in frontend
     ["Consumer preference shifts", "Positive", ["Demand"]],
     ["Seasonal demand spikes", "Positive", ["Demand"]],
     ["New product version launches", "Positive", ["Demand"]],
@@ -134,7 +134,7 @@ events = [
     ["Development of predictive maintenance systems", "Positive", ["Production Capacity"]],
     ["Global reduction in trade tariffs", "Positive", ["Price", "Delivery Time"]],
     ["Increased investment in renewable energy infrastructure", "Positive", ["Production Capacity", "Price"]],
-    ["Advances in operation robotics", "Positive", ["Production Capacity"]]
+    ["Advances in operation robotics", "Positive", ["Production Capacity"]] # display in frontend
 ]
 
 save_data_to_json(data=events, save_path="src/gnn/gnn_dataset/supply_chain_events.json")

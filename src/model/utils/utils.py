@@ -7,7 +7,7 @@ import re
 import json
 import dgl
 from typing import Callable
-
+import pickle
 
 
 def split_demand(demand: int, num_suppliers: int, num_agents_per_stage: int):
@@ -26,9 +26,9 @@ def split_demand(demand: int, num_suppliers: int, num_agents_per_stage: int):
 
     return demands.tolist()
 
-def save_string_to_file(data: str, save_path: str, t: int, round: int, reward: int):
-    print("Saving data to: ", f"results/{save_path}/chat_summary_round{round}_period{t}_reward{reward}.txt")
-    with open(f"results/{save_path}/chat_summary_round{round}_period{t}_reward{reward}.txt", 'w') as f:
+def save_chat_history_to_file(data: str, save_path: str, t: int, round: int=0):
+    print("Saving data to: ", f"results/{save_path}/chat_results/chat_summary_round{round}_period{t}.txt")
+    with open(f"results/{save_path}/chat_results/chat_summary_round{round}_period{t}.txt", 'w') as f:
         f.write(data)
 
 def save_dict_to_json(data: dict, save_path: str):
@@ -46,6 +46,7 @@ def read_data_from_json(read_path: str):
     with open(read_path) as f:
         data = json.load(f)
     return data
+
 
 def clear_dir(dir_path: str):
     # Clear the directory
@@ -84,6 +85,66 @@ def parse_stage_agent_id(stage_agent_id_name: str):
     stage, agent = id_name.split("_")
 
     return int(stage), int(agent)
+
+
+def create_action_dicts(env_config: str):
+    print("Create action dictionaries for order, supply, demand, and price")
+    # Create action dictionaries for order, supply, demand, and price
+    all_action_order_dicts = {}
+    all_action_sup_dicts = {}
+    all_action_dem_dicts = {}
+    all_action_price_dicts = {}
+    all_reward_dicts = {}
+    all_state_dicts = {}
+
+    save_data_to_json(all_action_order_dicts, f"env/{env_config}/all_action_order_dicts.json")
+    save_data_to_json(all_action_sup_dicts, f"env/{env_config}/all_action_sup_dicts.json")
+    save_data_to_json(all_action_dem_dicts, f"env/{env_config}/all_action_dem_dicts.json")
+    save_data_to_json(all_action_price_dicts, f"env/{env_config}/all_action_price_dicts.json")
+    save_data_to_json(all_reward_dicts, f"env/{env_config}/all_reward_dicts.json")
+    save_data_to_json(all_state_dicts, f"env/{env_config}/all_state_dicts.json")
+
+    return 
+
+
+def load_all_action_dicts(env_config: str):
+
+    if os.path.exists(f"env/{env_config}/all_action_order_dicts.json"):
+        all_action_order_dicts = read_data_from_json(f"env/{env_config}/all_action_order_dicts.json")
+    else:
+        all_action_order_dicts = {}
+    if os.path.exists(f"env/{env_config}/all_action_sup_dicts.json"):
+        all_action_sup_dicts = read_data_from_json(f"env/{env_config}/all_action_sup_dicts.json")
+    else:
+        all_action_sup_dicts = {}
+    if os.path.exists(f"env/{env_config}/all_action_dem_dicts.json"):
+        all_action_dem_dicts = read_data_from_json(f"env/{env_config}/all_action_dem_dicts.json")
+    else:
+        all_action_dem_dicts = {}
+    if os.path.exists(f"env/{env_config}/all_action_price_dicts.json"):
+        all_action_price_dicts = read_data_from_json(f"env/{env_config}/all_action_price_dicts.json")
+    else:
+        all_action_price_dicts = {}
+    if os.path.exists(f"env/{env_config}/all_reward_dicts.json"):
+        all_reward_dicts = read_data_from_json(f"env/{env_config}/all_reward_dicts.json")
+    else:
+        all_reward_dicts = {}
+    if os.path.exists(f"env/{env_config}/all_state_dicts.json"):
+        all_state_dicts = read_data_from_json(f"env/{env_config}/all_state_dicts.json")
+    else:
+        all_state_dicts = {}
+
+    return all_action_order_dicts, all_action_sup_dicts, all_action_dem_dicts, all_action_price_dicts, all_reward_dicts, all_state_dicts
+
+def load_action_dicts(env_config: str):
+
+    action_sup_dicts = read_data_from_json(f"env/{env_config}/action_sup_dicts.json")
+    action_dem_dicts = read_data_from_json(f"env/{env_config}/action_dem_dicts.json")
+    action_order_dicts = read_data_from_json(f"env/{env_config}/action_order_dicts.json")
+    action_price_dicts = read_data_from_json(f"env/{env_config}/action_price_dicts.json")
+
+    return action_order_dicts, action_sup_dicts, action_dem_dicts, action_price_dicts
+
 
 # Create a multipartite graph
 def draw_multipartite_graph(env, t: int, save_prefix: str):
@@ -133,71 +194,26 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
     plt.title("Multipartite Graph")
     plt.savefig(os.path.join(save_path, "img_results", f"supply_chain_period_{t}.jpg"), format="jpg")
 
-# def draw_multipartite_graph_for_data_geration(, save_prefix: str):
 
+
+
+def visualize_state(env, t: int, save_prefix: str):
     
-
-
-def draw_material_flow(env, t: int, save_prefix: str):
-    num_stages = env.num_stages
-    num_agents_per_stage = env.num_agents_per_stage
-    sup_rel = env.arriving_orders[:, :, :, t]
-    save_path = f'results/{save_prefix}/'
-
-    M = nx.DiGraph()
-
-    # Add nodes for each set
-    stage_agents = []
-    for m in range(num_stages):
-        stage_agents = []
-        for x in range(num_agents_per_stage):
-            stage_agents.append(f"s{m}a{x}")
-        M.add_nodes_from(stage_agents, layer=num_stages-m)  # Add set A nodes
-
-    # Add edges between the sets
-    edges = []
-    edge_labels = {}
-    for m in range(num_stages-1):
-        for x in range(num_agents_per_stage):
-            for i in range(num_agents_per_stage):
-                if sup_rel[m][x][i] > 0:
-                    src = f"s{m+1}a{i}"
-                    tgt = f"s{m}a{x}"
-                    edges.append((src, tgt))
-                    edge_labels[(src, tgt)] = sup_rel[m][x][i]
-    M.add_edges_from(edges)
-
-
-    # Define positions for the multipartite layout
-    pos = nx.multipartite_layout(M, subset_key="layer")
-
-    # Draw the multipartite graph
-    # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
-    stage_colors = ["gold", "violet", "limegreen", "darkorange",]
-    colors = [stage_colors[m] for m in range(num_stages) for _ in range(num_agents_per_stage)]
-
-    plt.figure(figsize=(25, 20))
-    nx.draw(M, pos, with_labels=True, node_color=colors, node_size=100, font_size=12, edge_color="gray", alpha=1)
-    nx.draw_networkx_edge_labels(G=M, pos=pos, edge_labels=edge_labels)
-    plt.title("Material Flow Graph")
-    plt.savefig(os.path.join(save_path, f"material_flow_period_{t}.jpg"), format="jpg")
-
-
-
-def visualize_state(env, rewards: dict, t: int, save_prefix: str):
-    
+    # env.update_state_on_t(env.period-1)
     state_dict = env.state_dict
     num_stages = env.num_stages
     num_agents_per_stage = env.num_agents_per_stage
     lt_max = env.max_lead_time
     save_path = f'results/{save_prefix}/'
+    xy_locations = np.load(f'env/{save_prefix}/xy_locations.npy')
+
     df = pd.DataFrame({
         "stage": {},
         "agent_idx": {}, 
         "profits": {}, 
         "prod_capacity": {},
         "inventory": {},
-        "sales_price": {},       
+        "sale_price": {},       
         "backlog_cost": {},
         "holding_cost": {},
         "backlog": {}, 
@@ -209,37 +225,74 @@ def visualize_state(env, rewards: dict, t: int, save_prefix: str):
         "recent_sales": {},
         "lead_time": {},
         "deliveries": {},
+        "orders": {},
+        'running_status': {},
+        "demand": {},
+        "location": {},
     })
     for stage in range(num_stages):
         for agent in range(num_agents_per_stage):
-
+            if stage == 0:
+                demand = env.demands[env.period]
+            else:
+                demand = 0
             df = pd.concat([df, pd.DataFrame({
-                    'stage': [stage], 
-                    "agent_idx": [agent],
-                    "prod_capacity": [state_dict[f'stage_{stage}_agent_{agent}'][0]],
-                    'sales_price': [state_dict[f'stage_{stage}_agent_{agent}'][1]],
-                    'order_cost': [state_dict[f'stage_{stage}_agent_{agent}'][2]],
-                    'backlog_cost': [state_dict[f'stage_{stage}_agent_{agent}'][3]],
-                    'holding_cost': [state_dict[f'stage_{stage}_agent_{agent}'][4]],
-                    'lead_time': [state_dict[f'stage_{stage}_agent_{agent}'][5]],
-                    'inventory': [state_dict[f'stage_{stage}_agent_{agent}'][6]],
-                    'backlog': [state_dict[f'stage_{stage}_agent_{agent}'][7]],
-                    'upstream_backlog': [state_dict[f'stage_{stage}_agent_{agent}'][8]],
-                    "suppliers": [state_dict[f'stage_{stage}_agent_{agent}'][9]],
-                    "customers": [state_dict[f'stage_{stage}_agent_{agent}'][10]],
-                    'recent_sales': [state_dict[f'stage_{stage}_agent_{agent}'][11]],
-                    'deliveries': [state_dict[f'stage_{stage}_agent_{agent}'][12]],
-                    'prod_cost': [state_dict[f'stage_{stage}_agent_{agent}'][13]], 
-                    'profits': [rewards.get(f'stage_{stage}_agent_{agent}', None)]
-                    })], ignore_index=True)
+                'stage': [stage], 
+                "agent_idx": [agent],
+                "prod_capacity": [state_dict[f'stage_{stage}_agent_{agent}'][0]],
+                'sale_price': [state_dict[f'stage_{stage}_agent_{agent}'][1]],
+                'order_cost': [state_dict[f'stage_{stage}_agent_{agent}'][2]],
+                'backlog_cost': [state_dict[f'stage_{stage}_agent_{agent}'][3]],
+                'holding_cost': [state_dict[f'stage_{stage}_agent_{agent}'][4]],
+                'lead_time': [state_dict[f'stage_{stage}_agent_{agent}'][5]],
+                'inventory': [state_dict[f'stage_{stage}_agent_{agent}'][6]],
+                'backlog': [state_dict[f'stage_{stage}_agent_{agent}'][7]],
+                'upstream_backlog': [state_dict[f'stage_{stage}_agent_{agent}'][8]],
+                "suppliers": [state_dict[f'stage_{stage}_agent_{agent}'][9]],
+                "customers": [state_dict[f'stage_{stage}_agent_{agent}'][10]],
+                'recent_sales': [state_dict[f'stage_{stage}_agent_{agent}'][11]],
+                'deliveries': [state_dict[f'stage_{stage}_agent_{agent}'][12]],
+                'prod_cost': [state_dict[f'stage_{stage}_agent_{agent}'][13]], 
+                'running_status': [state_dict[f'stage_{stage}_agent_{agent}'][14]],
+                "orders": [state_dict[f'stage_{stage}_agent_{agent}'][15]],
+                'profits': [state_dict[f'stage_{stage}_agent_{agent}'][16]],
+                "demand": [demand],
+                "location": [xy_locations[stage][agent].tolist()]
+                })], ignore_index=True)
     
     df = df.groupby(by=['stage', 'agent_idx']).apply(lambda x: x).reset_index(drop=True)
-    os.makedirs(save_path, exist_ok=True)
+    df['stage'] =df['stage'].astype(int)
+    df['agent_idx'] = df['agent_idx'].astype(int)
+    df['running_status'] = df['running_status'].astype(int)
+    df['profits'] = df['profits'].astype(int)
+    df['prod_capacity'] = df['prod_capacity'].astype(int)
+    df['inventory'] = df['inventory'].astype(int)
+    df['sale_price'] = df['sale_price'].astype(int)
+    df['backlog_cost'] = df['backlog_cost'].astype(int)
+    df['holding_cost'] = df['holding_cost'].astype(int)
+    df['backlog'] = df['backlog'].astype(int)
+    df['demand'] = df['demand'].astype(int)
+    # df['upstream_backlog'] = df['upstream_backlog'].astype(int)
+    # df['order_cost'] = df['order_cost'].astype(int)
+    df['prod_cost'] = df['prod_cost'].astype(int)
+
+    print("save data to", os.path.join(save_path, "df_results", f"env_period_{t}.csv"))
     df.to_csv(os.path.join(save_path, "df_results", f"env_period_{t}.csv"), index=False)
     df.to_json(os.path.join(save_path, "json_results", f"env_period_{t}.json"), orient='records', indent=4)
     draw_multipartite_graph(env=env, t=t, save_prefix=save_prefix)
     # draw_material_flow(env=env, t=t, save_prefix=save_prefix)
+    return df.to_json(orient='records', indent=4)
+
+def add_xy_locations_to_env_json(env_json: dict, xy_location_path: str, num_stages: int, num_agents_per_stage: int) -> dict:
+    # Load the xy_locations.npy file
+    xy_locations = np.load(xy_location_path)
     
+    for m in range(num_stages):
+        for x in range(num_agents_per_stage):
+            env_json[m*num_agents_per_stage+x]['xy_location'] = xy_locations[m][x].tolist()
+    
+    return env_json
+
 
 def random_relations(n_cand: int, n_relation: int):
 

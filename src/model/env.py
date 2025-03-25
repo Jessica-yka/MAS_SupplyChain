@@ -14,10 +14,12 @@ import sys
 # sys.path.append('/home/vislab/Yanjia/MAS_SupplyChain')
 sys.path.append('src/model')
 from .config import env_configs_list, get_env_configs
-from .utils.utils import visualize_state, parse_stage_agent_id, clear_dir
+from .utils.utils import visualize_state, parse_stage_agent_id, clear_dir, read_data_from_json
 from .data_simulation import generate_sup_dem_relations
 import os
 import copy
+import re
+import json
 # from sc_graph import create_agent_profiles, SupplyChain_Graph
 
 np.random.seed(0)
@@ -138,7 +140,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demands = np.zeros(self.num_periods + 1, dtype=int)
         self.profits = np.zeros((self.num_stages, self.num_agents_per_stage, self.num_periods + 1), dtype=int)
         self.total_profits = np.zeros(self.num_periods + 1, dtype=int)
-        self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage))
+        self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage), dtype=int)
         self.shutdown_agents_set = set()
         self.env_no_backlog = env_no_backlog
 
@@ -221,11 +223,11 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demand_relations = copy.deepcopy(self.init_demand_relations)
         self.sale_prices = copy.deepcopy(self.init_sale_prices)
         # self.sc_graph.reset_G()
-        self.update_state()
+        self.update_state_on_t(0)
 
         return self.state_dict, {}
 
-    def update_state(self) -> None:
+    def update_state_on_t(self, t: int) -> None:
         """
         Update the environment state including the current stage features, inventory, backlog, upstream backlog,
         supply relations, demand relations, 
@@ -235,7 +237,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         sup_rel, dem_rel, 
         S_{m,x,t-L_max}, ..., S_{m,x,t-1}, 0, ..., 0, R_{m,x,t-L_m}, ..., R_{m,x,t-1}]
         """
-        t = self.period
+        # t = self.period
+        # print("update state on t", t)
         states = dict()
         states["prod_capacities"] = self.prod_capacities
         states["sale_prices"] = self.sale_prices
@@ -250,6 +253,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         states["upstream_backlogs"][:-1] = self.backlogs[1:, :, t]
         states["suppliers"] = self.supply_relations
         states["customers"] = self.demand_relations
+        states["orders"] = self.orders[:, :, :, t]
+        states["profit"] = self.profits[:, :, t]
 
         lt_max = self.max_lead_time
         states["recent_sales"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, lt_max), dtype=int)
@@ -258,6 +263,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         elif t > 0:
             states["recent_sales"][:, :, -t:] = self.sales[:, :, 1:(t + 1)]
 
+        # print(self.sales[:,:,1:(t+1)])
+        # print("recent sales at update_state func", states["recent_sales"])
         states["arriving_deliveries"] = np.zeros(shape=(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage, lt_max), dtype=int)
         # print("\n\nupdate status, arriving orders\n", self.arriving_orders)
         for m in range(self.num_stages):
@@ -269,7 +276,10 @@ class InventoryManagementEnv(MultiAgentEnv):
                         states["arriving_deliveries"][m, x, j, -lt:] = self.arriving_orders[m, x, j, (t - lt + 1):(t + 1)]
                     elif t > 0:
                         states["arriving_deliveries"][m, x, j, -t:] = self.arriving_orders[m, x, j, 1:(t + 1)]
-        
+
+
+        states["running_agents"] = self.running_agents
+        # print(states['recent_sales'])
         # self.state_dict = {f"stage_{m}_agent_{x}": states[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
         self.state_dict = {}
         for m in range(self.num_stages):
@@ -289,34 +299,56 @@ class InventoryManagementEnv(MultiAgentEnv):
                 agent_state.append(states["recent_sales"][m][x])
                 agent_state.append(states["arriving_deliveries"][m][x])
                 agent_state.append(states["prod_costs"][m][x])
+                agent_state.append(states["running_agents"][m][x])
+                agent_state.append(states["orders"][m][x])
+                agent_state.append(states["profit"][m][x])
 
                 self.state_dict[f"stage_{m}_agent_{x}"] = agent_state
 
         return self.state_dict
 
-    def step(self, order_dict: dict[str, int], price_dict: dict[str, int], sup_dict: dict[str, list], dem_dict: dict[str, list]) -> tuple[dict, dict, dict, dict, dict]:
+
+    def update_action_to_env(self, order_dict: dict[str, int], price_dict: dict[str, int], sup_dict: dict[str, list], dem_dict: dict[str, list]=None):
+        
+        assert np.all(f"stage_{m}_agent_{x}" in order_dict for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
+            "Order quantities for all stages are required."
+        assert np.all(order_dict[f"stage_{m}_agent_{x}"] >= 0 for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
+            "Order quantities must be non-negative integers."
+        
+        M = self.num_stages
+        t = self.period
+        # update_order; keep the record at t+1
+        self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
+
+        # Update price if needed
+        if self.enable_price_change:
+            for m in range(self.num_stages):
+                for x in range(self.num_agents_per_stage):
+                    self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
+            self.order_costs[:M-1, :] = self.sale_prices[1:, :]
+        # update supple/demand relations if needed
+        if self.enable_graph_change:
+            self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)         
+            self.demand_relations[1:, :, :] = np.transpose(self.supply_relations[:-1, :, :], (0, 2, 1))   
+        self.demands[t] = int(self.demand_fn(t))
+                                                                                                                               
+
+    def step(self) -> tuple[dict, dict, dict, dict, dict]:
         """
         Take a step and return the next observation
 
         :param action_dict: action (order quantity) for each stage
         :return: states, rewards, terminations, truncations, infos
         """
-        assert np.all(f"stage_{m}_agent_{x}" in order_dict for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
-            "Order quantities for all stages are required."
-        assert np.all(order_dict[f"stage_{m}_agent_{x}"] >= 0 for m in range(self.num_stages) for x in range(self.num_agents_per_stage)), \
-            "Order quantities must be non-negative integers."
+        
 
-        # Get the inventory at the beginning of the period
+        # Get the inventory at the beginning of the period. 
+        # keep the record of this period as the initial state of the next period.
         self.period += 1
         t = self.period
         M = self.num_stages
         current_inventories = self.inventories[:, :, t - 1]
-        # update supple/demand relations if needed
-        if self.enable_graph_change:
-            self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)         
-            self.demand_relations[1:, :, :] = np.transpose(self.supply_relations[:-1, :, :], (0, 2, 1))                                                                                                                          
-        self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
-        
+
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
         self.demands[t] = int(self.demand_fn(t))
         # Add the delivered orders
@@ -330,7 +362,7 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         # Compute the fulfilled orders
         # R_{m,t} = min(B_{m+1,t-1} + O_{m,t}, I_{m+1,t-1} + R_{m+1,t-L_{m+1}}, c_{m+1}), m = 0, ..., M - 2
-        cum_req_orders = np.sum(self.orders[:, :, :, t], axis=1)
+        cum_req_orders = np.sum(self.orders[:, :, :, t-1], axis=1)
         fulfilled_orders = np.zeros(shape=(self.num_stages, self.num_agents_per_stage), dtype=int)
         fulfilled_orders[:-1] = np.minimum(
             np.minimum(self.backlogs[1:, :, t - 1] + cum_req_orders[:-1], current_inventories[1:]),
@@ -339,14 +371,13 @@ class InventoryManagementEnv(MultiAgentEnv):
         fulfilled_orders[M - 1] = cum_req_orders[M - 1] # the manufacturers at the top of supply chain
         fulfilled_rates = (fulfilled_orders+1e-10) / (cum_req_orders+1e-10)
         fulfilled_rates = np.repeat(fulfilled_rates[:, np.newaxis, :], self.num_agents_per_stage, axis=1)
-        self.arriving_orders[:, :, :, t] = (self.orders[:, :, :, t] * fulfilled_rates).astype(int)
+        self.arriving_orders[:, :, :, t] = (self.orders[:, :, :, t-1] * fulfilled_rates).astype(int)
 
         # Compute the sales
         cum_fulfilled_orders = np.sum(self.arriving_orders, axis=1) # M * N * T -> the total orders fulfilled by stage m + 1 at time t
         # S_{m,t} = R_{m-1,t}, m = 1, ..., M - 1
         self.sales[1:, :, t] = cum_fulfilled_orders[:-1, :, t]
         # S_{0,t} = min(B_{0,t-1} + D_{t}, I_{0,t-1} + R_{0,t-L_m}, c_0)
-
         self.sales[0, :, t] = np.minimum(
             np.minimum(self.backlogs[0, :, t - 1] + self.demands[t], current_inventories[0]),
             self.prod_capacities[0])
@@ -370,12 +401,6 @@ class InventoryManagementEnv(MultiAgentEnv):
                              - self.backlog_costs * self.backlogs[:, :, t] - self.holding_costs * self.inventories[:, :, t]
         self.total_profits[t] = np.sum(self.profits[:, :, t])
 
-        # Update price if needed
-        if self.enable_price_change:
-            for m in range(self.num_stages):
-                for x in range(self.num_agents_per_stage):
-                    self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
-            self.order_costs[:M-1, :] = self.sale_prices[1:, :]
 
         # Determine rewards and terminations
         rewards = {f"stage_{m}_agent_{x}": self.profits[m, x, t] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)}
@@ -388,7 +413,8 @@ class InventoryManagementEnv(MultiAgentEnv):
         
         # print("arriving orders in step", self.arriving_orders)
         # Update the state
-        self.update_state()
+        self.update_state_on_t(self.period)
+        
 
         return self.state_dict, rewards, terminations, truncations, infos
 
@@ -400,20 +426,23 @@ class InventoryManagementEnv(MultiAgentEnv):
         :return: parsed state
         """
         return {
-            'prod_capacity': state[0],
-            'sale_price': state[1],
-            'order_costs': state[2],
-            'backlog_cost': state[3],
-            'holding_cost': state[4],
-            'lead_times': state[5],
-            'inventory': state[6],
-            'backlog': state[7],
-            'upstream_backlog': state[8],
-            "suppliers": state[9], 
-            "customers": state[10], 
+            'prod_capacity': int(state[0]),
+            'sale_price': int(state[1]),
+            'order_costs': state[2].tolist(),
+            'backlog_cost': int(state[3]),
+            'holding_cost': int(state[4]),
+            'lead_times': state[5].tolist(),
+            'inventory': int(state[6]),
+            'backlog': int(state[7]),
+            'upstream_backlog': int(state[8]),
+            "suppliers": state[9].tolist(), 
+            "customers": state[10].tolist(), 
             'sales': state[11].tolist(),
             'deliveries': state[12].tolist(),
-            'prod_cost': state[13], 
+            'prod_cost': int(state[13]), 
+            "running_status": int(state[14]),
+            "orders": state[15].tolist(),
+            "profit": int(state[16]),
         }
 
     def parse_state(self, state_dict: dict = None) -> dict:
@@ -433,13 +462,14 @@ class InventoryManagementEnv(MultiAgentEnv):
 
         return parsed_state
 
+
     def no_backlog_env_proxy(self, stage_id: int, agent_id: int,
                          action_order_dict: dict, action_sup_dict: dict, action_price_dict: dict):
         # Keep the supply relation at the initial stage
         sup_action = self.supply_relations[stage_id][agent_id]
         if sum(sup_action) == 0: # if it is just recovered
             sup_action = self.init_supply_relations[stage_id][agent_id]
-        action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action
+        action_sup_dict[f'stage_{stage_id}_agent_{agent_id}'] = sup_action.tolist()
         
         # stage_order_action = np.random.uniform(1, 10, num_agents_per_stage).astype(int) * sup_action
         # split demand over multiple stage 1 suppliers
@@ -452,16 +482,21 @@ class InventoryManagementEnv(MultiAgentEnv):
         else: # split demand over multiple stage_id + 1 suppliers
             avg_order = np.mean([np.sum(action_order_dict[x]) for x in action_order_dict if f"stage_{stage_id-1}" in x])/sum(sup_action)
             stage_order_action = sup_action * avg_order.astype(int)
-        action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action
+        action_order_dict[f'stage_{stage_id}_agent_{agent_id}'] = stage_order_action.tolist()
 
         # Keep the initial price
         price = self.init_sale_prices[stage_id][agent_id]
-        action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = price
+        action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = int(price)
 
         return action_sup_dict, action_order_dict, action_price_dict
 
 
     def get_all_shutdown_agents(self):
+        self.shutdown_agents_set = set()
+        for m in range(self.num_stages):
+            for x in range(self.num_agents_per_stage):
+                if self.running_agents[m][x] == 0:
+                    self.shutdown_agents_set.add(f"stage_{m}_agent_{x}")
         print("The closed agents are", ", ".join(self.shutdown_agents_set))
 
 
@@ -474,11 +509,12 @@ class InventoryManagementEnv(MultiAgentEnv):
                 # state_dict[f"stage_{stage_id-1}_agent_{down_agent_id}"]["suppliers"][agent_id] = 0
                 self.supply_relations[stage_id-1][down_agent_id][agent_id] = 0
         # store newly shutdown agents in the list
-        self.shutdown_agents_set.add(f"stage_{stage_id}_agent_{agent_id}")
+        # self.shutdown_agents_set.add(f"stage_{stage_id}_agent_{agent_id}")
         # clear the inventory of shutdown agents
         self.inventories[stage_id, agent_id, self.period] = 0
 
         return state_dict
+
 
     def create_recovery_event(self, stage_id: int, agent_id: int):
         print(f"Re-open stage_{stage_id}_agent_{agent_id}.")
@@ -511,7 +547,6 @@ class InventoryManagementEnv(MultiAgentEnv):
             self.demand_fn.mean //= 2
         elif self.demand_fn.dist == "poisson_demand":
             self.demand_fn.mean //= 2
-
 
 
 def env_creator(env_config):
@@ -549,6 +584,156 @@ def env_creator(env_config):
         agent_profiles=agent_profiles,
         sc_graph = sc_graph,
     )
+
+
+def update_user_change_attribute_from_json(env: InventoryManagementEnv, env_json):
+
+    # period_info = read_data_from_json(env_file)
+    period_info = env_json
+    num_stages = env.num_stages
+    num_agents_per_stage = env.num_agents_per_stage
+
+    for m in range(num_stages):
+        for x in range(num_agents_per_stage):
+            stage_agent_id = f"stage_{m}_agent_{x}"
+            agent_period_info = period_info[m*num_agents_per_stage + x]
+
+            # env.period = t + 1
+            env.prod_capacities[m][x] = agent_period_info["prod_capacity"]
+            env.sale_prices[m][x] = agent_period_info["sale_price"]
+            env.backlog_costs[m][x] = agent_period_info["backlog_cost"]
+            env.holding_costs[m][x] = agent_period_info["holding_cost"]
+            env.lead_times[m][x] = agent_period_info["lead_time"]
+            env.supply_relations[m][x] = agent_period_info["suppliers"]
+            # env.demand_relations[m][x] = agent_period_info["customers"]
+            
+            env.prod_costs[m][x] = agent_period_info["prod_cost"]
+            env.running_agents[m][x] = agent_period_info["running_status"]  
+            # env.orders[m][x][t] = agent_period_info["orders"]      
+
+    env.update_state_on_t(t=env.period)
+
+    return env
+
+def update_user_change_order_from_json(env: InventoryManagementEnv, env_json):
+
+    # period_info = read_data_from_json(env_file)
+    period_info = env_json
+    num_stages = env.num_stages
+    num_agents_per_stage = env.num_agents_per_stage
+    t = env.period
+    for m in range(num_stages):
+        for x in range(num_agents_per_stage):
+            stage_agent_id = f"stage_{m}_agent_{x}"
+            agent_period_info = period_info[m*num_agents_per_stage + x]
+ 
+            env.orders[m][x][:, t] = agent_period_info["orders"]      
+
+    env.update_state_on_t(t=env.period)
+
+    return env
+
+
+def save_env_attributes(env: InventoryManagementEnv, file_path: str):
+    env_attributes = {
+        "lead_times": env.lead_times.tolist(),
+        "prod_capacities": env.prod_capacities.tolist(),
+        "order_costs": env.order_costs.tolist(),
+        "prod_costs": env.prod_costs.tolist(),
+        "backlog_costs": env.backlog_costs.tolist(),
+        "holding_costs": env.holding_costs.tolist(),
+        "llm_agent_set": env.llm_agent_set,
+        "state_format": env.state_format,
+        "emergent_events": env.emergent_events,
+        "period": env.period,
+        "inventories": env.inventories.tolist(),
+        "orders": env.orders.tolist(),
+        "arriving_orders": env.arriving_orders.tolist(),
+        "sales": env.sales.tolist(),
+        "backlogs": env.backlogs.tolist(),
+        "demands": env.demands.tolist(),
+        "profits": env.profits.tolist(),
+        "total_profits": env.total_profits.tolist(),
+        "running_agents": env.running_agents.tolist(),
+        "shutdown_agents_set": list(env.shutdown_agents_set)
+    }
+
+    with open(file_path, 'w') as f:
+        json.dump(env_attributes, f, indent=4)
+
+
+def load_env_attributes(env: InventoryManagementEnv, file_path: str) -> InventoryManagementEnv:
+    with open(file_path, 'r') as f:
+        env_attributes = json.load(f)
+
+    env.period = env_attributes["period"]
+    env.lead_times = np.array(env_attributes["lead_times"])
+    env.prod_capacities = np.array(env_attributes["prod_capacities"])
+    env.order_costs = np.array(env_attributes["order_costs"])
+    env.prod_costs = np.array(env_attributes["prod_costs"])
+    env.backlog_costs = np.array(env_attributes["backlog_costs"])
+    env.holding_costs = np.array(env_attributes["holding_costs"])
+    env.inventories = np.array(env_attributes["inventories"])
+    env.orders = np.array(env_attributes["orders"])
+    env.arriving_orders = np.array(env_attributes["arriving_orders"])
+    env.sales = np.array(env_attributes["sales"])
+    env.backlogs = np.array(env_attributes["backlogs"])
+    env.demands = np.array(env_attributes["demands"])
+    env.profits = np.array(env_attributes["profits"])
+    env.total_profits = np.array(env_attributes["total_profits"])
+    env.running_agents = np.array(env_attributes["running_agents"])
+    env.shutdown_agents_set = set(env_attributes["shutdown_agents_set"])
+
+    return env
+
+
+def reverse_env_to_t(env: InventoryManagementEnv, t: int, config_name: str):
+
+    print("reset the environment to period", t)
+    env.inventories[:, :, t+1:] = 0
+    env.orders[:, :, :, t+1:] = 0
+    env.arriving_orders[:, :, :, t+1:] = 0
+    env.sales[:, :, t+1:] = 0
+    env.backlogs[:, :, t+1:] = 0
+    env.demands[t+1:] = 0
+    env.profits[:, :, t+1:] = 0
+    env.total_profits[t+1:] = 0
+    env.period = t
+
+    # Remove env_period_t.json files that have t > env.period
+    results_dir = f"results/{config_name}/json_results"
+    for file_name in os.listdir(results_dir):
+        match = re.match(r'env_period_(\d+)\.json', file_name)
+        if match:
+            file_period = int(match.group(1))
+            if file_period > env.period :
+                os.remove(os.path.join(results_dir, file_name))
+
+    # Remove img_results files that have t > env.period
+    img_results_dir = f"results/{config_name}/img_results"
+    for file_name in os.listdir(img_results_dir):
+        match = re.match(r'supply_chain_period_(\d+)\.jpg', file_name)
+        if match:
+            file_period = int(match.group(1))
+            if file_period > env.period:
+                os.remove(os.path.join(img_results_dir, file_name))
+
+    # Remove df_results files that have t > env.period
+    df_results_dir = f"results/{config_name}/df_results"
+    for file_name in os.listdir(df_results_dir):
+        match = re.match(r'env_period_(\d+)\.csv', file_name)
+        if match:
+            file_period = int(match.group(1))
+            if file_period > env.period:
+                os.remove(os.path.join(df_results_dir, file_name))
+
+    chat_results_dir = f"results/{config_name}/chat_results"
+    for file_name in os.listdir(chat_results_dir):
+        match = re.match(r'chat_summary_round0_period(\d+)\.csv', file_name)
+        if match:
+            file_period = int(match.group(1))
+            if file_period > env.period:
+                os.remove(os.path.join(chat_results_dir, file_name))
 
 
 if __name__ == '__main__':

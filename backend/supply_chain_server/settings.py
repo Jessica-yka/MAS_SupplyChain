@@ -124,6 +124,8 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'dist',  # Vue 打包的根目录
+    BASE_DIR / 'dist/static',  # 添加这行，指向 Vue 的静态资源目录
+    BASE_DIR / 'dist/assets',  # 保留这个以防万一
 ]
 
 # 添加数据文件路径配置
@@ -171,3 +173,10 @@ CORS_ALLOW_HEADERS = [
 
 # 添加安全相关配置
 SECURE_CROSS_ORIGIN_OPENER_POLICY = None
+# import os
+# import sys
+
+# # 在 INSTALLED_APPS 之前添加
+# BASE_DIR = Path(__file__).resolve().parent.parent
+# PROJECT_ROOT = BASE_DIR.parent
+# sys.path.append(str(PROJECT_ROOT))
