@@ -125,7 +125,7 @@ STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'dist',  # Vue 打包的根目录
     BASE_DIR / 'dist/static',  # 添加这行，指向 Vue 的静态资源目录
-    BASE_DIR / 'dist/assets',  # 保留这个以防万一
+    # BASE_DIR / 'dist/assets',  # 保留这个以防万一
 ]
 
 # 添加数据文件路径配置

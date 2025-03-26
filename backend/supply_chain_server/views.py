@@ -57,8 +57,10 @@ def next_step(request):
             print(f"当前事件: {events}")
 
             # 开发模式的假数据
-            fake_data_path = f'/home/vislab/Yanjia/MAS_SupplyChain/backend/fake_data/env_period_1.json'
-            result = json.load(fake_data_path)
+            fake_data_path = f'/home/vislab/Yanjia/MAS_SupplyChain/backend/fake_data/env_period_0.json'
+
+            with open(fake_data_path, 'r') as f:
+                result = json.load(f)
 
             # 运行模式
             # if period == -1:
