@@ -57,20 +57,20 @@ def next_step(request):
             print(f"当前事件: {events}")
 
             # 开发模式的假数据
-            fake_data_path = f'/home/vislab/Yanjia/MAS_SupplyChain/backend/fake_data/env_period_0.json'
+            # fake_data_path = f'/home/vislab/Yanjia/MAS_SupplyChain/backend/fake_data/env_period_0.json'
 
-            with open(fake_data_path, 'r') as f:
-                result = json.load(f)
+            # with open(fake_data_path, 'r') as f:
+            #     result = json.load(f)
 
             # 运行模式
-            # if period == -1:
-            #     # 初始化模拟
-            #     result = period_simulation_framework(env_json=None, cur_period=0)
-            #     # 读取初始化后的环境数据
-            # else:
-            #     # 使用当前环境数据继续模拟
-            #     result = period_simulation_framework(env_json=agents, cur_period=period+1)
+            # 在调用 period_simulation_framework 之前设置默认参数
+            sys.argv = [sys.argv[0]]  # 清除所有命令行参数，只保留脚本名
             
+            if period == -1:
+                result = period_simulation_framework(env_json=None, cur_period=0, events=events)
+            else:
+                result = period_simulation_framework(env_json=agents, cur_period=period+1, events=events)
+                
             return JsonResponse(result, safe=False)
                 
         except (json.JSONDecodeError, FileNotFoundError) as e:

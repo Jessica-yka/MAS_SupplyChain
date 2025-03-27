@@ -213,7 +213,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demands.fill(0)
         self.profits.fill(0)
         self.total_profits.fill(0)
-        self.running_agents = np.ones((self.num_stages, self.max_num_agents_per_stage), dtype=int)
+        self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage), dtype=int)
         self.shutdown_agents_set = set()
 
         # Set the initial condition and state
@@ -651,7 +651,7 @@ def update_user_change_attribute_from_json(env: InventoryManagementEnv, env_json
         elif affected_attr == "Demand":
             env.create_demand_surge() if event_type == "Positive" else env.create_demand_drop()
         elif affected_attr == "Delivery Time":
-            env.lead_times[affected_stage_idx][affected_agent_idx] = int(env.lead_times[affected_stage_idx][affected_agent_idx] / 1.5) if event_type == "Positive" else int(env.lead_times[affected_stage_idx][affected_agent_idx] * 1.5)
+            env.lead_times[affected_stage_idx][affected_agent_idx] = env.lead_times[affected_stage_idx][affected_agent_idx] / 1.5 if event_type == "Positive" else env.lead_times[affected_stage_idx][affected_agent_idx] * 1.5
         else:
             raise ValueError(f"Unknown affected aspect: {affected_attr}")
     env.emergent_events = emergent_events
