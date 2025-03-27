@@ -25,8 +25,8 @@ from src.model.data_simulation import generate_lead_time, generate_prod_capacity
 from src.model.data_simulation import generate_cost_price, generate_sup_dem_relations
 from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories
 from src.model.data_simulation import Demand_fn
-from utils.retrieval import get_demand_sub_df_edges, get_event_sub_df_edges, get_lt_sub_df_edges, get_price_sub_df_edges, get_of_sub_df_edges, get_sub_df_nodes
-from utils.utils import rank_suppliers_by_reliability
+from src.gnn.preprocess.utils.retrieval import get_event_sub_df_edges, get_sub_df_nodes
+from src.gnn.preprocess.utils.utils import rank_suppliers_by_reliability
 import matplotlib.pyplot as plt
 import networkx as nx
 import random
@@ -35,107 +35,16 @@ from tqdm import tqdm
 import torch
 from scipy.stats import rankdata
 from concurrent.futures import ThreadPoolExecutor
-from utils.utils import save_graph_to_json, save_env_to_json
+from src.gnn.preprocess.utils.utils import save_graph_to_json, save_env_to_json
 import random
 import argparse
+from src.gnn.preprocess.events import events
 np.random.seed(2025)
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--for_train', action='store_true', default=False)
 # Define the list of events with simplified descriptions
-events = [
-    ["Event", "Effect Type", "Affected Aspect"],
-    ["Earthquakes", "Negative", ["Production Capacity"]], # display in frontend
-    ["Hurricanes", "Negative", ["Delivery Time"]],
-    ["Floods", "Negative", ["Order Fulfillment"]],
-    ["Wildfires", "Negative", ["Production Capacity"]],
-    ["Droughts", "Negative", ["Price"]],
-    ["Tsunamis", "Negative", ["Delivery Time"]],
-    ["Volcano eruptions", "Negative", ["Delivery Time"]],
-    ["Severe storms", "Negative", ["Delivery Time"]], # display in frontend
-    ["Pandemics", "Negative", ["Production Capacity"]],
-    ["Factory closures", "Negative", ["Production Capacity"]],
-    ["Workforce absenteeism", "Negative", ["Production Capacity"]], # display in frontend
-    ["Recessions", "Negative", ["Demand"]],
-    ["Inflation", "Negative", ["Price"]],
-    ["Trade wars", "Negative", ["Price"]],
-    ["Economic booms", "Positive", ["Demand"]],
-    ["Wage increases", "Negative", ["Price"]], 
-    ["Labor strikes", "Negative", ["Production Capacity"]],
-    ["Port congestion", "Negative", ["Delivery Time"]],
-    ["Fuel shortages", "Negative", ["Delivery Time"]],
-    ["Road closures", "Negative", ["Delivery Time"]],
-    ["Truck driver shortages", "Negative", ["Delivery Time"]],
-    ["Rail strikes", "Negative", ["Delivery Time"]],
-    ["Air traffic disruptions", "Negative", ["Delivery Time"]],
-    ["Shipping container shortages", "Negative", ["Price"]],
-    ["New environmental regulations", "Negative", ["Price"]],
-    ["Bans on certain materials", "Negative", ["Production Capacity"]],
-    ["Import/export law changes", "Negative", ["Delivery Time"]],
-    ["Tax reforms", "Positive", ["Price"]],
-    ["Licensing delays", "Negative", ["Production Capacity"]],
-    ["Raw material shortages", "Negative", ["Price"]],
-    ["Discovery of abundant raw materials", "Positive", ["Price"]],
-    ["Mining accidents", "Negative", ["Production Capacity"]],
-    ["Water scarcity", "Negative", ["Price"]],
-    ["Automation", "Positive", ["Production Capacity"]],
-    ["AI implementation", "Positive", ["Production Capacity"]],
-    ["Better forecasting tools", "Positive", ["Order Fulfillment"]],
-    ["Drone delivery", "Positive", ["Delivery Time"]], 
-    ["Renewable energy adoption", "Positive", ["Price"]], # display in frontend
-    ["Consumer preference shifts", "Positive", ["Demand"]],
-    ["Seasonal demand spikes", "Positive", ["Demand"]],
-    ["New product version launches", "Positive", ["Demand"]],
-    ["Social media campaigns", "Positive", ["Demand"]],
-    ["Negative publicity", "Negative", ["Demand"]],
-    ["War", "Negative", ["Delivery Time"]],
-    ["Sanctions", "Negative", ["Production Capacity"]],
-    ["Political instability", "Negative", ["Delivery Time"]],
-    ["Trade agreements", "Positive", ["Price"]],
-    ["Border closures", "Negative", ["Delivery Time"]],
-    ["Factory fires", "Negative", ["Production Capacity"]],
-    ["Equipment breakdowns", "Negative", ["Production Capacity"]],
-    ["Lean manufacturing", "Positive", ["Production Capacity"]],
-    ["Outsourcing", "Positive", ["Price"]],
-    ["Climate change", "Negative", ["Price"]],
-    ["Extreme heat", "Negative", ["Production Capacity"]],
-    ["Biodiversity loss", "Negative", ["Production Capacity"]],
-    ["Panic buying", "Positive", ["Demand"]],
-    ["Increased popularity", "Positive", ["Demand"]],
-    ["New substitute", "Negative", ["Demand"]],
-    ["Viral trends", "Positive", ["Demand"]],
-    ["Cyberattacks", "Negative", ["Production Capacity"]],
-    ["Supply chain software failures", "Negative", ["Delivery Time"]],
-    ["Data breaches", "Negative", ["Demand"]],
-    ["Blockchain implementation", "Positive", ["Production Capacity", "Delivery Time"]],
-    ["Rising oil prices", "Negative", ["Price"]],
-    ["Power outages", "Negative", ["Production Capacity"]],
-    ["Electrification of fleets", "Positive", ["Price", "Delivery Time"]],
-    ["Just-in-Time (JIT) implementation", "Positive", ["Order Fulfillment"]],
-    ["Customer loss due to delays", "Negative", ["Demand"]],
-    ["Premium pricing for faster delivery", "Positive", ["Price"]],
-    ["Trade show cancellations", "Negative", ["Demand"]],
-    ["Major sporting events", "Positive", ["Demand"]],
-    ["Packaging shortages", "Negative", ["Production Capacity", "Delivery Time"]],
-    ["Transportation accidents", "Negative", ["Delivery Time"]],
-    ["New packaging", "Positive", ["Price"]],
-    ["Market booms in emerging economies", "Positive", ["Demand"]],
-    ["Subsidies", "Positive", ["Price"]],
-    ["Higher taxes", "Negative", ["Price"]],
-    ["Mergers", "Positive", ["Delivery Time"]],
-    ["Natural gas shortages", "Negative", ["Production Capacity", "Price"]],
-    ["Government incentives for green energy", "Positive", ["Production Capacity"]],
-    ["Adoption of electric vehicles in logistics", "Positive", ["Delivery Time", "Price"]],
-    ["Breakthroughs in recycling technology", "Positive", ["Order Fulfillment", "Price"]],
-    ["Government subsidies for local manufacturing", "Positive", ["Production Capacity", "Price"]],
-    ["Introduction of autonomous delivery systems", "Positive", ["Delivery Time"]],
-    ["High investor trust in brand reliability", "Positive", ["Demand"]],
-    ["Partnerships with local suppliers", "Positive", ["Delivery Time", "Production Capacity"]],
-    ["Development of predictive maintenance systems", "Positive", ["Production Capacity"]],
-    ["Global reduction in trade tariffs", "Positive", ["Price", "Delivery Time"]],
-    ["Increased investment in renewable energy infrastructure", "Positive", ["Production Capacity", "Price"]],
-    ["Advances in operation robotics", "Positive", ["Production Capacity"]] # display in frontend
-]
+
 
 save_data_to_json(data=events, save_path="src/gnn/gnn_dataset/supply_chain_events.json")
 
@@ -157,7 +66,7 @@ def assign_events(num_events: int, num_stages: int, num_agents_per_stage: int):
     return dict(zip(event_idx, assigned_agents))
 
 
-def convert_env_to_node_df(env: dict):
+def convert_env_to_node_df(env: dict, event_dict: dict):
     num_stages = env['num_stages']
     num_agents_per_stage = env['num_agents_per_stage']
     stage_names = env['stage_names']
@@ -165,8 +74,8 @@ def convert_env_to_node_df(env: dict):
     num_nodes = 1 + num_stages * num_agents_per_stage + num_current_events
     df_node = pd.DataFrame(index=range(num_nodes), columns=["node_id", "type"])
     df_node["node_id"] = np.arange(num_nodes).tolist()
-    df_node["name"] = ["Customers"]+[f"stage_{m}_agent_{x}" for m in range(num_stages) for x in range(num_agents_per_stage)] + [event_dict['events'][eidx] for eidx in env['events'].keys()]
-    df_node["type"] = ["customers"]+[stage_names[m] for m in range(num_stages) for x in range(num_agents_per_stage)] + ["event" for _ in range(num_current_events)]
+    df_node["name"] = ["Customers"] + [f"stage_{m}_agent_{x}" for m in range(num_stages) for x in range(num_agents_per_stage)] + [event_dict['events'][eidx] for eidx in env['events'].keys()]
+    df_node["type"] = ["customers"] + [stage_names[m] for m in range(num_stages) for x in range(num_agents_per_stage)] + ["event" for _ in range(num_current_events)]
     df_node['sale_price'] = [0] + env['sale_prices'].flatten().tolist() + [0 for _ in range(num_current_events)]
     df_node['prod_capacity'] = [0] + env['prod_capacities'].flatten().tolist() + [0 for _ in range(num_current_events)]
     df_node['prod_cost'] = [0] + env['prod_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
@@ -177,7 +86,9 @@ def convert_env_to_node_df(env: dict):
     df_node['upstream_backlog'] = [0] + [0 for _ in range(num_stages*num_agents_per_stage)] + [0 for _ in range(num_current_events)]
     df_node['stage_id'] = [-1] + [m for m in range(num_stages) for _ in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
     df_node['agent_id'] = [-1] + [x for _ in range(num_stages) for x in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
-    
+    df_node['running_status'] = [1] + env['running_agents'].flatten().tolist() + [1 for _ in range(num_current_events)]
+    df_node = df_node[df_node['running_status'] == 1].reset_index(drop=True)
+
     return df_node
 
 
@@ -292,7 +203,7 @@ def generate_env(env_config_name: str):
     num_periods = env_configs["num_periods"]
     num_total_agents = num_stages * num_agents_per_stage
     num_init_suppliers = env_configs["num_init_suppliers"]
-
+    running_agents = env_configs
 
     supply_relations, demand_relations = \
         generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, \
@@ -341,6 +252,7 @@ def generate_env(env_config_name: str):
             'stage_names': stage_names,
             'order_fulfill_rates': order_fulfill_rates,
             'requested_order': np.zeros((num_stages, num_agents_per_stage)), # because each agent has only one supplier, so l reduce the 3d array to 2d array
+            'running_agents': np.ones((num_stages, num_agents_per_stage)), # assume all agents are working
         }
 
 # %%
@@ -415,7 +327,7 @@ def generate_event_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
                 
                 event_target_node_relation = random.choice(['upstream suppliers', 'downstream customers'])
                 # asp = random.choice(down_aspect_list) if node_rel == 'customers' else random.choice(up_aspect_list)
-                question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, how would the {event_node} affect your {event_target_node_relation}? Answer either 'positive' or 'negative' if it happens to your {event_target_node_relation}(s), otherwise answer 'neutral'."
+                question = f"You are {target_node} at round {t}. Based on the provided supply chain graph, how would the {event_node} affect your {event_target_node_relation}? Answer either 'positive' or 'negative' if it happens to your {event_target_node_relation}(s), otherwise answer 'neutral'."
                 answer = "neutral"
 
             elif cases == 'downstream':
@@ -424,7 +336,7 @@ def generate_event_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
                     target_node = random.choice(list_all_predecessor_nodes(G=G, node=event_target_node))
                 except:
                     continue
-                question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, how would the {event_node} affect your downstream customers? Answer either 'positive' or 'negative' if it happens to your customers(s), otherwise answer 'neutral'."
+                question = f"You are {target_node} at round {t}. Based on the provided supply chain graph, how would the {event_node} affect your downstream customers? Answer either 'positive' or 'negative' if it happens to your customer(s), otherwise answer 'neutral'."
                 answer = "positive" if event_type == "Positive" else "negative"
             else:
                 # asp = random.choice(up_aspect_list)
@@ -480,7 +392,7 @@ def generate_price_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env
             target_node_agent_id = int(target_node_agent_id)
 
         cur_target_nodes.append(target_node)
-        question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, which of the upstream agents at stage {target_node_stage_id+1} offer the lowerest price? Answer with the node id, e.g. 15."
+        question = f"You are {target_node} at round {t}. Based on the provided supply chain graph, which of the upstream agents at stage {target_node_stage_id+1} offer the lowerest price? Answer with the node id, e.g. 15."
         
         if target_node_stage_id == num_stages-1: # in test set, it is possible that the target node is the last stage
             answer_agent_id = 0
@@ -530,7 +442,7 @@ def generate_lead_time_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame,
             target_node_agent_id = int(target_node_agent_id)
 
         
-        question = f"Your are {target_node} at round {t}. Based on the provided supply chain graph, which of the upstream agents at stage {target_node_stage_id+1} has the shortest lead time? Answer with the node id, e.g. 17."
+        question = f"You are {target_node} at round {t}. Based on the provided supply chain graph, which of the upstream agents at stage {target_node_stage_id+1} has the shortest lead time? Answer with the node id, e.g. 17."
         if target_node_stage_id == num_stages-1: # in test set, it is possible that the target node is the last stage
             answer_agent_id = 0
         else:
@@ -580,7 +492,7 @@ def generate_orderFulfill_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFra
 
         
         supp_node_agent_id = np.argmax(env['supply_relations'][target_node_stage_id][target_node_agent_id])
-        question = f"Your are {target_node} at round {t}. Considering the provided supply chain graph, is your supplier stage_{target_node_stage_id+1}_agent_{supp_node_agent_id} meeting the order fulfillment by delivering the full requested amount of products in your order at round {t-1}? Please answer with either 'yes' or 'no'."
+        question = f"You are {target_node} at round {t}. Considering the provided supply chain graph, is your supplier stage_{target_node_stage_id+1}_agent_{supp_node_agent_id} meeting the order fulfillment by delivering the full requested amount of products in your order at round {t-1}? Please answer with either 'yes' or 'no'."
         if target_node_stage_id < num_stages - 1:
             answer = "yes" if env['order_fulfill_rates'][target_node_stage_id+1][supp_node_agent_id][target_node_agent_id] == 1 else "no"
         else:
@@ -629,20 +541,13 @@ def generate_demand_questions(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, en
 
         
         if target_node_stage_id == 0:
-            question = f"Your are {target_node} at round {t-1}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the downstream demand at round {t-1}? Answer with either 'yes' or 'no'."
+            question = f"You are {target_node} at round {t-1}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the downstream demand at round {t-1}? Answer with either 'yes' or 'no'."
         else:
-            question = f"Your are {target_node} at round {t-1}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the requested order at round {t-1}? Answer with either 'yes' or 'no'."
+            question = f"You are {target_node} at round {t-1}. Based on the provided supply chain graph, do you have sufficient inventory to fulfill the requested order at round {t-1}? Answer with either 'yes' or 'no'."
         if env['requested_order'][target_node_stage_id][target_node_agent_id] <= env['inventories'][target_node_stage_id*num_agents_per_stage+target_node_agent_id]:
             answer = "yes"
         else:
             answer = 'no'
-
-        # Save the target-node-related graph as node df/edge df/graph/graph img
-        # df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
-        # df_simp_edges = get_demand_sub_df_edges(df_nodes=df_sub_nodes, df_edges=df_edges, target_node=target_node)
-        # visualize_contextualized_supply_chain_subgraph(env=env, target_node=target_node, df_edges=df_simp_edges, df_nodes=df_sub_nodes, path=f"{save_graph_img_path}/{data_idx+n_cum_questions}.png")
-        # df_sub_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
-        # df_simp_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
 
         df_nodes.to_csv(f"{save_node_path}/{data_idx+n_cum_questions}.csv", index=False)
         df_edges.to_csv(f"{save_edge_path}/{data_idx+n_cum_questions}.csv", index=False)
@@ -678,8 +583,8 @@ if __name__ == "__main__":
     create_order_fulfill_questions = True
     create_demand_questions = True
     
-    save_node_path = f"{save_path}/{env_config_name}/{data_type}_data/nodes"
-    save_edge_path = f"{save_path}/{env_config_name}/{data_type}_data/edges"
+    save_node_path = f"{save_path}/{env_config_name}/{data_type}_data/original_nodes"
+    save_edge_path = f"{save_path}/{env_config_name}/{data_type}_data/original_edges"
     save_graph_path = f"{save_path}/{env_config_name}/{data_type}_data/graphs"
     save_graph_img_path = f"{save_path}/{env_config_name}/{data_type}_data/graph_imgs"
     save_env_path = f"{save_path}/{env_config_name}/{data_type}_data/envs"
@@ -722,7 +627,7 @@ if __name__ == "__main__":
 
         events = assign_events(num_events, num_stages, num_agents_per_stage)
         env['events'] = events
-        df_nodes = convert_env_to_node_df(env=env)
+        df_nodes = convert_env_to_node_df(env=env, event_dict=event_dict)
         node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
         df_edges = convert_env_to_edge_df(env=env, event_dict=event_dict)
 

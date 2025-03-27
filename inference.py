@@ -26,11 +26,11 @@ def main(args):
     print(args)
 
     # dataset = load_dataset[args.dataset](dataset='all_train_questions.csv')
-    event_dataset = load_dataset[args.dataset](dataset='all_event_questions.csv', type='events_qa')
-    order_fulfill_dataset = load_dataset[args.dataset](dataset='all_order_fulfill_questions.csv', type='order_fulfill_qa')
-    price_dataset = load_dataset[args.dataset](dataset='all_price_questions.csv', type='price_qa')
-    lead_time_dataset = load_dataset[args.dataset](dataset='all_lead_time_questions.csv', type='lead_time_qa')
-    demand_dataset = load_dataset[args.dataset](dataset='all_demand_questions.csv', type='demand_qa')
+    event_dataset = load_dataset[args.dataset](dataset='all_event_questions.csv', type='events_qa', prompting_tech=args.prompting_tech)
+    order_fulfill_dataset = load_dataset[args.dataset](dataset='all_order_fulfill_questions.csv', type='order_fulfill_qa', prompting_tech=args.prompting_tech)
+    price_dataset = load_dataset[args.dataset](dataset='all_price_questions.csv', type='price_qa', prompting_tech=args.prompting_tech)
+    lead_time_dataset = load_dataset[args.dataset](dataset='all_lead_time_questions.csv', type='lead_time_qa', prompting_tech=args.prompting_tech)
+    demand_dataset = load_dataset[args.dataset](dataset='all_demand_questions.csv', type='demand_qa', prompting_tech=args.prompting_tech)
 
     event_idx_split = event_dataset.get_idx_split() 
     order_fulfill_idx_split = order_fulfill_dataset.get_idx_split()
@@ -52,7 +52,7 @@ def main(args):
 
     # Step 4. Evaluating
     os.makedirs(f'{args.output_dir}/{args.dataset}', exist_ok=True)
-    path = f'{args.output_dir}/{args.dataset}/model_name_{args.model_name}_llm_model_name_{args.llm_model_name}_llm_frozen_{args.llm_frozen}_max_txt_len_{args.max_txt_len}_max_new_tokens_{args.max_new_tokens}_gnn_model_name_{args.gnn_model_name}_patience_{args.patience}_num_epochs_{args.num_epochs}_seed{seed}.csv'
+    path = f'{args.output_dir}/{args.dataset}/model_name_{args.model_name}{args.prompting_tech}_llm_model_name_{args.llm_model_name}_llm_frozen_{args.llm_frozen}_max_txt_len_{args.max_txt_len}_max_new_tokens_{args.max_new_tokens}_gnn_model_name_{args.gnn_model_name}_patience_{args.patience}_num_epochs_{args.num_epochs}_seed{seed}.csv'
     print(f'path: {path}')
 
     model.eval()

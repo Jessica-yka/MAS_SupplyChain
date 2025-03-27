@@ -54,7 +54,12 @@ def get_event_sub_df_edges(G: nx.DiGraph, df_nodes: pd.DataFrame, df_edges: pd.D
 
     df_events = df_edges[df_edges['label'].str.contains('affects')].reset_index(drop=True)
     for i in range(len(df_events)):
-        df_simp_edges.loc[row_idx] = [node_name_id_map[df_events.loc[i, 'source']], df_events.loc[i, 'label'], node_name_id_map[df_events.loc[i, 'target']], df_events.loc[i, 'source'], df_events.loc[i, 'target']]
+        try:
+            df_simp_edges.loc[row_idx] = [node_name_id_map[df_events.loc[i, 'source']], df_events.loc[i, 'label'], node_name_id_map[df_events.loc[i, 'target']], df_events.loc[i, 'source'], df_events.loc[i, 'target']]
+        except:
+            print('source', df_events.loc[i, 'source'])
+            print('target', df_events.loc[i, 'target'])
+            exit()
         row_idx += 1
     # df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
     return df_simp_edges
@@ -65,7 +70,7 @@ def get_of_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_n
     node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
     df_simp_edges = df_edges[(df_edges['source']==target_node)|(df_edges['target']==target_node)].reset_index(drop=True)
     # get sub df_edges that the edge attrs contains either request or delivery
-    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request') | df_simp_edges['label'].str.contains('deliverying')].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('order') | df_simp_edges['label'].str.contains('request') | df_simp_edges['label'].str.contains('deliverying')].reset_index(drop=True)
 
     df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
@@ -83,7 +88,7 @@ def get_demand_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, targ
 
     node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
     df_simp_edges = df_edges[(df_edges['target']==target_node)].reset_index(drop=True)
-    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request')|df_simp_edges['label'].str.contains('demand')].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('request')|df_simp_edges['label'].str.contains('demand')|df_simp_edges['label'].str.contains('order')].reset_index(drop=True)
 
     df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
@@ -127,8 +132,23 @@ def get_price_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, targe
     # change the column name "label to edge_attr"
     df_simp_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
     df_simp_edges = df_simp_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
-    # remove aspect column
-    # df_simp_edges.drop(columns=['aspect'], inplace=True)
+
+    return df_simp_edges
+
+def get_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_node: str, G, path: str=None):
+
+    df_event_edges = get_event_sub_df_edges(G=G, df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+
+    df_other_edges = df_edges[(df_edges['target']==target_node)|(df_edges['source']==target_node)].reset_index(drop=True) 
+    node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
+    df_other_edges['src'] = df_other_edges['source'].apply(lambda x: node_name_id_map[x])
+    df_other_edges['dst'] = df_other_edges['target'].apply(lambda x: node_name_id_map[x])
+    df_other_edges.rename(columns={'label': 'edge_attr', 'source': "src_name", "target": 'dst_name'}, inplace=True)
+    df_other_edges = df_other_edges[['src', 'edge_attr', 'dst', 'src_name', 'dst_name']]
+
+    df_simp_edges = pd.concat([df_event_edges, df_other_edges], axis=0).reset_index(drop=True)
+    # get unique row data
+    df_simp_edges = df_simp_edges.drop_duplicates(subset=['src', 'edge_attr', 'dst'], keep='first').reset_index(drop=True)
 
     return df_simp_edges
 
@@ -146,7 +166,8 @@ def get_sub_df_nodes(df_nodes: pd.DataFrame, target_node: str, path: str=None):
                     f"production capacity: {df_nodes.loc[i, 'prod_capacity']}, "
                     f"inventory: {df_nodes.loc[i, 'inventory']}, "
                     f"backlog: {df_nodes.loc[i, 'backlog']}, "
-                    f"upstream backlog: {df_nodes.loc[i, 'upstream_backlog']}")
+                    # f"upstream backlog: {df_nodes.loc[i, 'upstream_backlog']}",
+                    )
             df_nodes_sub.loc[i, ['node_id', 'node_attr', 'type', 'name']] = [df_nodes.loc[i, 'node_id'], attr, df_nodes.loc[i, 'type'], df_nodes.loc[i, 'name']]
         # the suppliers of the target node
         elif f"stage_{df_nodes.loc[i, 'stage_id']-1}" in target_node:

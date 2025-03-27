@@ -20,6 +20,7 @@ import os
 import copy
 import re
 import json
+from src.gnn.preprocess.events import events
 # from sc_graph import create_agent_profiles, SupplyChain_Graph
 
 np.random.seed(0)
@@ -52,7 +53,7 @@ class InventoryManagementEnv(MultiAgentEnv):
     """
 
     def __init__(
-        self, num_stages: int, num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
+        self, num_stages: int, num_agents_per_stage: int, max_num_agents_per_stage: int, num_periods: int, init_inventories: list, lead_times: list, demand_dist: str, demand_fn: Callable,
         prod_capacities: list, sale_prices: np.array, order_costs: np.array, prod_costs: np.array, backlog_costs: np.array, holding_costs: np.array, state_format: str, 
         supply_relations: dict, demand_relations: dict, stage_names: list, agent_profiles: list, enable_graph_change: bool, 
         enable_price_change: bool, emergent_events: dict, env_no_backlog: bool=True, sc_graph=None, llm_agents: list=None, init_seed: int = 0):
@@ -105,6 +106,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         # Set the environment configurations
         self.num_stages = num_stages
         self.num_agents_per_stage = np.max([num_agents_per_stage])
+        self.max_num_agents_per_stage = max_num_agents_per_stage
         self.num_periods = num_periods
         self.stage_names = stage_names
         self.demand_dist = demand_dist
@@ -143,6 +145,9 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage), dtype=int)
         self.shutdown_agents_set = set()
         self.env_no_backlog = env_no_backlog
+
+        # create event dict
+        self.event_dict = {event[0]: {"Effect Type": event[1], "Affected Aspect": event[2], "id": event[3]} for event in events[1:]}
 
         # Compute the upper bounds for state variables
         max_production = self.max_production
@@ -208,7 +213,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.demands.fill(0)
         self.profits.fill(0)
         self.total_profits.fill(0)
-        self.running_agents = np.ones((self.num_stages, self.num_agents_per_stage))
+        self.running_agents = np.ones((self.num_stages, self.max_num_agents_per_stage), dtype=int)
         self.shutdown_agents_set = set()
 
         # Set the initial condition and state
@@ -222,6 +227,9 @@ class InventoryManagementEnv(MultiAgentEnv):
         self.supply_relations = copy.deepcopy(self.init_supply_relations)
         self.demand_relations = copy.deepcopy(self.init_demand_relations)
         self.sale_prices = copy.deepcopy(self.init_sale_prices)
+        # setup demand (the demand is not subject to agent decisions.)
+        for t in range(self.period+1):
+            self.demands[t] = int(self.demand_fn(t))
         # self.sc_graph.reset_G()
         self.update_state_on_t(0)
 
@@ -317,20 +325,31 @@ class InventoryManagementEnv(MultiAgentEnv):
         
         M = self.num_stages
         t = self.period
-        # update_order; keep the record at t+1
-        self.orders[:, :, :, t] = np.stack([order_dict[f"stage_{m}_agent_{x}"]*self.supply_relations[m][x] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
+        # update_order; 
+        for key, value in order_dict.items():
+            match = re.match(r"stage_(\d+)_agent_(\d+)", key)
+            if match:
+                m, x = int(match.group(1)), int(match.group(2))
+                self.orders[m, x, :, t] = value
 
-        # Update price if needed
-        if self.enable_price_change:
-            for m in range(self.num_stages):
-                for x in range(self.num_agents_per_stage):
-                    self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
-            self.order_costs[:M-1, :] = self.sale_prices[1:, :]
-        # update supple/demand relations if needed
+            # Update price if needed
+            # if self.enable_price_change:
+            #     for m in range(self.num_stages):
+            #         for x in range(self.num_agents_per_stage):
+            #             self.sale_prices[m][x] = price_dict[f"stage_{m}_agent_{x}"]
+            #     self.order_costs[:M-1, :] = self.sale_prices[1:, :]
+
+            # update supple/demand relations if needed
         if self.enable_graph_change:
-            self.supply_relations = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)         
-            self.demand_relations[1:, :, :] = np.transpose(self.supply_relations[:-1, :, :], (0, 2, 1))   
-        self.demands[t] = int(self.demand_fn(t))
+            for key, value in sup_dict.items():
+                match = re.match(r"stage_(\d+)_agent_(\d+)", key)
+                if match:
+                    m, x = int(match.group(1)), int(match.group(2))
+                    self.supply_relations[m][x] = np.array(value)
+            # self.supply_relations[m, x, :] = np.stack([sup_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)         
+    
+        self.demand_relations[1:, :, :] = np.transpose(self.supply_relations[:-1, :, :], (0, 2, 1))   
+        # self.demands[t] = int(self.demand_fn(t))
                                                                                                                                
 
     def step(self) -> tuple[dict, dict, dict, dict, dict]:
@@ -350,7 +369,7 @@ class InventoryManagementEnv(MultiAgentEnv):
         current_inventories = self.inventories[:, :, t - 1]
 
         # self.demand_relations = np.stack([dem_dict[f"stage_{m}_agent_{x}"] for m in range(self.num_stages) for x in range(self.num_agents_per_stage)]).reshape(self.num_stages, self.num_agents_per_stage, self.num_agents_per_stage)
-        self.demands[t] = int(self.demand_fn(t))
+        # self.demands[t] = int(self.demand_fn(t))
         # Add the delivered orders
         # I_{m,t} <- I_{m,t-1} + R_{m,t-L_m} (after delivery)
         for m in range(self.num_stages):
@@ -561,6 +580,7 @@ def env_creator(env_config):
     return InventoryManagementEnv(
         num_stages=env_config['num_stages'],
         num_agents_per_stage=env_config['num_agents_per_stage'],
+        max_num_agents_per_stage=env_config['max_num_agents_per_stage'],
         num_periods=env_config['num_periods'],
         init_inventories=env_config['init_inventories'],
         lead_times=env_config['lead_times'],
@@ -586,7 +606,7 @@ def env_creator(env_config):
     )
 
 
-def update_user_change_attribute_from_json(env: InventoryManagementEnv, env_json):
+def update_user_change_attribute_from_json(env: InventoryManagementEnv, env_json, events: list):
 
     # period_info = read_data_from_json(env_file)
     period_info = env_json
@@ -611,6 +631,30 @@ def update_user_change_attribute_from_json(env: InventoryManagementEnv, env_json
             env.running_agents[m][x] = agent_period_info["running_status"]  
             # env.orders[m][x][t] = agent_period_info["orders"]      
 
+    # update environments by events
+    # [{'id': 'event-1742998185720', 'type': 'Advances in operation robotics', 'effect': 'Positive', 'nodeStage': 2, 'nodeIndex': 0, 'companyType': 'Distributors'}, {'id': 'event-1742998269683', 'type': 'Severe storms', 'effect': 'Negative', 'nodeStage': 3, 'nodeIndex': 0, 'companyType': 'Manufacturers'}]
+    emergent_events = {}
+    for event in events:
+        event_name = event["type"]
+        event_type = event["effect"]
+        affected_attr = env.event_dict[event_name]['Affected Aspect'][0]
+        event_id = env.event_dict[event_name]['id']
+        affected_stage_idx = (event["nodeStage"])
+        affected_agent_idx = (event["nodeIndex"])
+        emergent_events[event_id] = (affected_stage_idx, affected_agent_idx)
+
+        if affected_attr == "Production Capacity" or affected_attr == "Order Fulfillment":
+            print('double capacity')
+            env.prod_capacities[affected_stage_idx][affected_agent_idx] = int(env.prod_capacities[affected_stage_idx][affected_agent_idx] * 1.5) if event_type == "Positive" else int(env.prod_capacities[affected_stage_idx][affected_agent_idx] / 1.5)
+        elif affected_attr == "Price":
+            env.sale_prices[affected_stage_idx][affected_agent_idx] = int(env.sale_prices[affected_stage_idx][affected_agent_idx] / 1.5) if event_type == "Positive" else int(env.sale_prices[affected_stage_idx][affected_agent_idx] * 1.5)
+        elif affected_attr == "Demand":
+            env.create_demand_surge() if event_type == "Positive" else env.create_demand_drop()
+        elif affected_attr == "Delivery Time":
+            env.lead_times[affected_stage_idx][affected_agent_idx] = int(env.lead_times[affected_stage_idx][affected_agent_idx] / 1.5) if event_type == "Positive" else int(env.lead_times[affected_stage_idx][affected_agent_idx] * 1.5)
+        else:
+            raise ValueError(f"Unknown affected aspect: {affected_attr}")
+    env.emergent_events = emergent_events
     env.update_state_on_t(t=env.period)
 
     return env

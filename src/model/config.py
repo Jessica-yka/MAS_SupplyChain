@@ -20,9 +20,10 @@ env_configs_list = {
         "sup_dem_relation_type": "random", # random/fixed
         "num_init_suppliers": 1,
         "num_init_customers": 1,
-        "num_agents_per_stage": 4, # >= 2
-        "num_periods": 15,
         "num_stages": 4,
+        "num_agents_per_stage": 4, # >= 2
+        "max_num_agents_per_stage": 8, # can add new agents in the middle way
+        "num_periods": 15,
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": {'dist': "uniform", 'lb': 10, 'ub': 15}, # constant/uniform/etc
         "price_cost_dist": {'dist': 'uniform', 'lb': 1, 'ub': 8}, # constant/uniform/normal/etc
@@ -32,36 +33,12 @@ env_configs_list = {
         "holding_costs_dist": {"dist": "constant", "mean": 10}, 
         "backlog_costs_dist": {'dist': "constant", "mean": 5}, 
         "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 
-        "llm_agents": [(0, 0)],
+        # "llm_agents": [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1), (3, 0), (3, 1)],
+        "llm_agents": [(0,0), (0,1), (1,0), (2,0), (3,0)],
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
         "env_no_backlog": False, 
-        "emergent_events": {0: {"events": ["earthquake"], 'affected_agents': [[(2, 10)]]},
-                            }, 
-
-    },
-    "large_graph_test_ee": {
-        "config_name": "large_graph_test",
-        "sup_dem_relation_type": "random", # random/fixed
-        "num_init_suppliers": 2,
-        "num_init_customers": 2,
-        "num_agents_per_stage": 20, # >= 2
-        "num_periods": 10,
-        "num_stages": 4,
-        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
-        "init_inventory_dist": ("uniform", 10, 15), # constant/uniform/etc
-        "price_cost_dist": "uniform", # constant/uniform/normal/etc
-        "lead_time_dist": ("uniform", 1, 10), # constant/uniform
-        "prod_capacity_dist": ("uniform", 10, 80), # constant/uniform
-        "demand_fn": {"dist": "constant_demand", "mean": 10, "trend": ""}, # constant/functional
-        "holding_costs_dist": "constant", 
-        "backlog_costs_dist": "constant", 
-        "profit_rate_dist": ("uniform", 0, 1), 
-        "llm_agents": [(1, 1)],
-        "enable_graph_change": True, 
-        "enable_price_change": False, 
-        "state_format": "base", 
         "emergent_events": {}, 
 
     },
@@ -116,12 +93,13 @@ def get_env_configs(env_configs: dict):
     enable_graph_change = env_configs["enable_graph_change"]
     enable_price_change = env_configs["enable_price_change"]
     emergent_events = env_configs["emergent_events"]
-
+    max_num_agents_per_stage = env_configs["max_num_agents_per_stage"]
 
     return {
         'num_stages': num_stages,
         'num_periods': num_periods,
         'num_agents_per_stage': num_agents_per_stage,
+        "max_num_agents_per_stage": max_num_agents_per_stage,
         "demand_dist": env_configs["demand_fn"]["dist"],
         'init_inventories': init_inventories, # num_stages * num_agents_per_stage
         'lead_times': lead_times, # num_stages * num_agents_per_stage * num_agents_per_stage

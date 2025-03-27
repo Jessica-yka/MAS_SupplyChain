@@ -35,7 +35,7 @@ class GraphLLM(torch.nn.Module):
 
         kwargs = {
             "max_memory": {0: '20GiB', 1: '20GiB', 2: '20GiB', 3: '20GiB'},
-            "device_map": "auto",
+            "device_map": None,
             "revision": "main",
         }
         print("kwargs", kwargs)
@@ -56,9 +56,10 @@ class GraphLLM(torch.nn.Module):
         model = AutoModelForCausalLM.from_pretrained(
             args.llm_model_path,
             quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
-            device_map="auto",              # Automatically map the model to GPU(s)
+            device_map=kwargs["device_map"],  # Automatically map the model to GPU(s)
             max_memory=kwargs["max_memory"],  # Set the maximum memory for each device
             revision=kwargs["revision"],  # Use the main revision of the model
+            low_cpu_mem_usage=True,  # Use less CPU memory
         )
 
         if args.llm_frozen == 'True':
@@ -236,7 +237,11 @@ class GraphLLM(torch.nn.Module):
                 'pred': pred,
                 'label': samples['label'],
                 'question': samples['question'],
-                'desc': samples['desc'], }
+                'desc': samples['desc'], 
+                'stage_idx': samples.get('stage_idx', None),
+                'agent_idx': samples.get('agent_idx', None),
+                'question_type': samples.get('question_type', None),
+                }
 
 
     def print_trainable_params(self):

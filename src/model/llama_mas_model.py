@@ -26,41 +26,35 @@ from torch.cuda.amp import autocast as autocast
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from torch_scatter import scatter
 from src.model.gnn import load_gnn_model
-from peft import (
-    LoraConfig,
-    get_peft_model,
-    prepare_model_for_kbit_training,
-)
+
 from utils.utils import extract_pairs
-from utils.generate_llama_message import generate_questions, generate_graph_description
-from utils.utils import visualize_state, save_string_to_file
+# from utils.generate_llama_message import generate_questions, generate_graph_description
+from utils.utils import visualize_state, save_chat_history_to_file
 from utils.utils import update_sup_action
 from src.gnn.preprocess.lm_modeling import load_model, load_text2embedding
-from src.gnn.preprocess.utils.retrieval import retrieval_via_pcst
-
+from src.gnn.supplychain_mas import SupplyChainMASDataset
 from src.model.env import env_creator
 from src.model.config import env_configs_list, get_env_configs
-from src.model.llm_config import llm_config_list
-from src.model.utils.utils import get_demand_description
 from src.model.utils.utils import clear_dir
+from utils.utils import visualize_state, save_chat_history_to_file, update_sup_action
+from utils.utils import read_data_from_json, save_data_to_json, load_all_action_dicts, load_action_dicts
 
 
-def create_agents(num_stages: int, num_agents_per_stage: int, args) -> List[AutoModelForCausalLM]:
-    
+def create_agents(num_stages: int, num_agents_per_stage: int) -> List[AutoModelForCausalLM]:
+    # load llm configs
+    args = parse_args_llama()
     agents = []
-
     # Build Model
     args.llm_model_path = llama_model_path[args.llm_model_name]
-
+    # Load pretrained LLAMA model
     model = load_llm_model[args.model_name](graph_type='Contextualized Supply Chain Graph', args=args) 
     model = _reload_best_model(model, args)
-
     agents.append(model)
 
     return agents
 
-
-def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
+# only backend testing
+# def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
 
     all_state_dicts = {}
     all_action_order_dicts = {}
@@ -206,7 +200,7 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
             f"round_reward_sum = {round_reward_sum}"
         )
         visualize_state(env=im_env, rewards=rewards, t=period, save_prefix=config_name)
-        save_string_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=round_reward_sum)
+        save_chat_history_to_file(data=total_chat_summary, save_path=config_name, t=period, round=round, reward=round_reward_sum)
 
     print(
         f"episode_reward = {episode_reward}"
@@ -216,91 +210,109 @@ def run_simulation(im_env, user_proxy, stage_agents, config_name, round:int=0):
         
     return episode_reward
 
-def encode_mas_supply_chain_graph(question: list, df_nodes: pd.DataFrame, df_edges: pd.DataFrame, env_name: str):
-    mas_model_path = f"output/mas_scm/{env_name}/"
+# single period simulation. Connect with front-end.
+def run_period_simulation(im_env, stage_agents: list, config_name: str, events: list=[]):
 
-    q_embs, graph = generate_text_embedding(path=mas_model_path, df_nodes=df_nodes, df_edges=df_edges, question=question)
-    subg, desc = preprocess(q_embs, graph, df_nodes, df_edges, require_retrieve=True)
+    # put the final environment info in the json file (agent decision+user change)
+    # visualize_state(env=im_env, t=im_env.period-1, save_prefix=config_name)
+    # retrieve the latest env info
+    # state_dict = im_env.parse_state(im_env.state_dict)
+    period = im_env.period
 
-    return subg, desc
+    # load model from stage_agents
+    model = stage_agents[0]
 
-
-def generate_text_embedding(path: str, df_nodes: pd.DataFrame, df_edges: pd.DataFrame, question:list):
-
-    model_name = 'sbert'
-    def _encode_questions():
-        q_embs = text2embedding(model, tokenizer, device, question)
-
-        return q_embs
-
-    def _encode_graph():
-
-        x = text2embedding(model, tokenizer, device, df_nodes.node_attr.tolist())
-        e = text2embedding(model, tokenizer, device, df_edges.edge_attr.tolist())
-        edge_index = torch.LongTensor([df_edges.src, df_edges.dst])
-        graph = Data(x=x, edge_index=edge_index, edge_attr=e, num_nodes=len(df_nodes))
-
-        return graph
-
-
-    os.makedirs(f'{path}/graphs/', exist_ok=True)
-    model, tokenizer, device = load_model[model_name]()
-    text2embedding = load_text2embedding[model_name]
-
-    q_embs = _encode_questions()
-    graph = _encode_graph()
-
-    return q_embs, graph
-
-
-def preprocess(q_embs, graph, df_nodes: pd.DataFrame, df_edges: pd.DataFrame, require_retrieve=True):
+    # all_state_dicts[period] = state_dict
+    action_order_dict = {}
+    action_price_dict = {}
+    action_sup_dict = {}
+    action_dem_dict = {}
     
-    if require_retrieve:
-        subg, desc = retrieval_via_pcst(graph, q_embs[0], df_nodes, df_edges, topk=12, topk_e=12, cost_e=0.5)
-    else:
-        subg = graph
-        desc = df_nodes.to_csv(index=False)+'\n'+df_edges.to_csv(index=False)
+    total_chat_summary = ""
+    # emergent_events = im_env.emergent_events.get(period, {'events': [], 'affected_agents': []})
+    num_stages = im_env.num_stages
+    num_agents_per_stage = im_env.num_agents_per_stage
+    llm_agent_set = im_env.llm_agent_set
+    enable_graph_change = im_env.enable_graph_change
+    enable_price_change = im_env.enable_price_change
+    shutdown_list = im_env.get_all_shutdown_agents()
+    recovery_list = None
 
-    return subg, desc
+    sc_mas_dataset = SupplyChainMASDataset(env=im_env)
+    with open("testing_llama_mas_question_formulation.csv", "w") as f:
+        for stage_id in range(num_stages):
+            mas_dataset = []
+            for agent_id in range(num_agents_per_stage):                
+                if im_env.running_agents[stage_id][agent_id] == 0:
+                    action_sup_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(num_agents_per_stage, dtype=int)
+                    action_order_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(num_agents_per_stage, dtype=int)  
+                    action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = 0
+                elif (stage_id, agent_id) in llm_agent_set: # just to have only a few agents in the environment to be controlled by LLM
+                    # stage_state = state_dict[f'stage_{stage_id}_agent_{agent_id}']
+                    mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'order placement'))
+                    if enable_graph_change and stage_id < num_stages - 1:
+                        mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'supplier selection'))
+                else:
+                    action_sup_dict, action_order_dict, action_price_dict = im_env.no_backlog_env_proxy(stage_id=stage_id, agent_id=agent_id, action_order_dict=action_order_dict, 
+                                                                                                    action_sup_dict=action_sup_dict, action_price_dict=action_price_dict)
 
 
+            mas_test_loader = DataLoader(mas_dataset, batch_size=int(num_agents_per_stage), drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
+            for i, batch in enumerate(mas_test_loader):
+                df = pd.DataFrame({"id": [], "pred": [], "label": [], "question": [], "desc": []})
+                with torch.no_grad():
+                    output = model.inference(batch)
+                    df = pd.concat([df, pd.DataFrame(output)], axis=0)
 
-def main(args):
+                    for _, row in df.iterrows():
+                        f.write(json.dumps(dict(row)) + "\n")
+
+                # Separate data with odd index (order amount) and even index (supplier id)
+                df['ans'] = df['pred'].apply(lambda x: int(re.search(r'\b\d+\b', x).group()) if re.search(r'\b\d+\b', x) else None)
+                df['ans'] = df['ans'].astype(int)
+
+                for row_index, row in df.iterrows():
+                    stage_idx, agent_idx = int(row['stage_idx']), int(row['agent_idx'])
+                    question_type = row['question_type']
+                    cur_supp_relation = im_env.supply_relations[stage_idx][agent_idx]
+                    if question_type == 'order placement':
+                        action_order_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = row['ans'] * cur_supp_relation
+
+                    if question_type == 'supplier selection':
+                        
+                        supp_stage_idx, supp_agent_idx = int(row['ans'])//num_agents_per_stage, int(row['ans'])%num_agents_per_stage
+                        if supp_stage_idx == stage_idx + 1: # check if the supplier is in the next stage
+                            supp_relation = np.zeros(num_agents_per_stage, dtype=int)
+                            supp_relation[supp_agent_idx] = 1
+                            action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = supp_relation
+                        else:
+                            action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = cur_supp_relation
+
+            # update env per stage
+            im_env.update_action_to_env(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict, price_dict=action_price_dict)
+
+    print(action_order_dict)
+    print(action_sup_dict)
+    save_chat_history_to_file(data=total_chat_summary, save_path=config_name, t=period)
+
+    # im_env.update_action_to_env(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict, price_dict=action_price_dict)
+    im_env.update_state_on_t(im_env.period)
+    env_json = visualize_state(env=im_env, t=im_env.period, save_prefix=config_name)
+
+    return im_env, env_json
 
 
-    env_config_name = "large_graph_test"
-    # create the dir to store the results
-    os.makedirs(f"results/{env_config_name}", exist_ok=True)
-    clear_dir(f"results/{env_config_name}")
-    # create the dir to store the env setup
-    os.makedirs(f"env/{env_config_name}", exist_ok=True)
-    clear_dir(f"env/{env_config_name}")
-    env_config = get_env_configs(env_configs=env_configs_list[env_config_name])
-    im_env = env_creator(env_config)
-
- 
-    # %%
-    print(env_config["demand_dist"])
-    print(get_demand_description(env_config["demand_fn"]))
-
-    rewards = []
-    for r in tqdm(range(1)):
-        print("\n\nNew round starts")
-        stage_agents = create_agents(num_stages=env_config["num_stages"], num_agents_per_stage=env_config["num_agents_per_stage"], args=args)
-        # stage_agents = []
-        reward = run_simulation(im_env=im_env, user_proxy=stage_agents, stage_agents=stage_agents, config_name=env_config_name, round=r)
-        rewards.append(reward)
-        print(f"rewards = {reward}")
-        # if reward < 0:
-        #     raise AssertionError("The rewards are negative")
-
-    mean_reward = np.mean(rewards)
-    std_reward = np.std(rewards)
-
-    print(f"Rewards: {rewards}")
-    print(f"Mean Episode Reward: {mean_reward}")
-    print(f"Standard Deviation of Episode Reward: {std_reward}")
 
 if __name__ == "__main__":
-    args = parse_args_llama()
-    main(args)
+
+    # Initialize the environment
+    config_name = "graph_4_4"
+    env_configs = env_configs_list[config_name]
+    env_config = get_env_configs(env_configs)
+    im_env = env_creator(env_config)
+    im_env.reset()
+    # Create Llama agents
+    stage_agents = create_agents(num_stages=im_env.num_stages, num_agents_per_stage=im_env.num_agents_per_stage)
+    # stage_agents = None
+    # Run the period simulation
+    im_env, env_json = run_period_simulation(im_env=im_env, stage_agents=stage_agents, config_name=config_name)

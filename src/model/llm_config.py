@@ -46,7 +46,7 @@ def parse_args_llama():
     parser.add_argument("--llm_frozen", type=str, default='True')
     parser.add_argument("--llm_num_virtual_tokens", type=int, default=10)
     parser.add_argument("--output_dir", type=str, default='output')
-    parser.add_argument("--prompting_tech", type=str, default='cot')
+    parser.add_argument("--prompting_tech", type=str, default='')
     parser.add_argument("--max_txt_len", type=int, default=512)
     parser.add_argument("--max_new_tokens", type=int, default=512)
     parser.add_argument("--max_memory", type=csv_list, default=[20,20])
@@ -59,6 +59,10 @@ def parse_args_llama():
     parser.add_argument("--gnn_hidden_dim", type=int, default=512)
     parser.add_argument("--gnn_num_heads", type=int, default=4)
     parser.add_argument("--gnn_dropout", type=float, default=0.0)
+
+    # MAS related
+    parser.add_argument("--cur_period", type=int, default=0)
+    parser.add_argument('--env_file', type=str, default=None, help='Environment Configuration')
 
     args = parser.parse_args()
     return args

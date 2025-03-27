@@ -142,9 +142,6 @@ def get_accuracy_webqsp(path):
 
 eval_funcs = {
     "supplychain_graphs": get_accuracy_sc_qa,
-    "expla_graphs": get_accuracy_expla_graphs,
-    "scene_graphs": get_accuracy_gqa,
-    "scene_graphs_baseline": get_accuracy_gqa,
-    "webqsp": get_accuracy_webqsp,
-    "webqsp_baseline": get_accuracy_webqsp,
+    "supplychain_graphs_inference": get_accuracy_sc_graphs,
+    "supplychain_graphs_baseline": get_accuracy_sc_qa,
 }

@@ -18,7 +18,7 @@ cached_graph = f'{PATH}/cached_graphs'
 cached_desc = f'{PATH}/cached_desc'
 
 class SupplyChainGraphsDataset(Dataset):
-    def __init__(self, dataset='all_event_questions.csv', type: str = 'event_qa'):
+    def __init__(self, dataset='all_event_questions.csv', type: str = 'event_qa', prompting_tech=None):
         super().__init__()
 
         self.text = pd.read_csv(f'{PATH}/{dataset}')

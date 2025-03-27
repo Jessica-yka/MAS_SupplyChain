@@ -10,17 +10,18 @@ from tqdm import tqdm
 
 PATH = 'src/gnn/gnn_dataset/graph_4_4/train_data'
 
-path_nodes = f'{PATH}/nodes'
-path_edges = f'{PATH}/edges'
-path_graphs = f'{PATH}/graphs'
-path_desc = f'{PATH}/desc'
-kaping_desc = f'{PATH}/kaping_desc'
+# path_nodes = f'{PATH}/nodes'
+# path_edges = f'{PATH}/edges'
+# path_graphs = f'{PATH}/graphs'
+cached_desc = f'{PATH}/cached_desc'
+kaping_desc = f'{PATH}/cached_kaping_desc'
 
 # cached_graph = f'{PATH}/cached_graphs'
 # cached_desc = f'{PATH}/cached_desc'
 
 # For GraphToken Experiment
 class SupplyChainGraphsInferenceDataset(Dataset):
+
     def __init__(self, prompting_tech: str, dataset='all_event_questions.csv', type: str = 'event_qa'):
         super().__init__()
 
@@ -34,8 +35,6 @@ class SupplyChainGraphsInferenceDataset(Dataset):
             self.prompt = "Let's think step by step."
         elif self.prompting_tech == 'cot-bag':
             self.prompt = "Let's construct a graph with the nodes and edges first."
-
-
 
 
     def __len__(self):
@@ -56,7 +55,7 @@ class SupplyChainGraphsInferenceDataset(Dataset):
         if self.prompting_tech == 'kaping':
             desc = open(f'{kaping_desc}/{data_index}.txt', 'r').read()
         else:
-            desc = open(f'{path_desc}/{data_index}.txt', 'r').read()
+            desc = open(f'{cached_desc}/{data_index}.txt', 'r').read()
 
         return {
             'id': data_index,

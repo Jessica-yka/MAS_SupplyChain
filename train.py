@@ -148,8 +148,8 @@ def main(args):
     path = f'{args.output_dir}/{args.dataset}/model_name_{args.model_name}_llm_model_name_{args.llm_model_name}_llm_frozen_{args.llm_frozen}_max_txt_len_{args.max_txt_len}_max_new_tokens_{args.max_new_tokens}_gnn_model_name_{args.gnn_model_name}_patience_{args.patience}_num_epochs_{args.num_epochs}_seed{seed}/best_results.csv'
     print(f'path: {path}')
 
-    # model = _reload_best_model(model, args)
-    model = _reload_model(model, "output/supplychain_graphs/model_name_graph_llm_llm_model_name_7b_chat_llm_frozen_True_max_txt_len_1024_max_new_tokens_512_gnn_model_name_gt_patience_2_num_epochs_15_seed4/checkpoint_7.pth")
+    model = _reload_best_model(model, args)
+    # model = _reload_model(model, "output/supplychain_graphs/model_name_graph_llm_llm_model_name_7b_chat_llm_frozen_True_max_txt_len_1024_max_new_tokens_512_gnn_model_name_gt_patience_2_num_epochs_15_seed4/checkpoint_7.pth")
     model.eval()
     progress_bar_test = tqdm(range(len(test_loader)))
     with open(path, "w") as f:

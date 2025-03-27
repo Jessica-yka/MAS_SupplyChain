@@ -16,6 +16,7 @@ def generate_split(num_nodes: str, path: str):
     # Create a folder for the split
     os.makedirs(path, exist_ok=True)
 
+    
     # Save the indices to separate files
     with open(f'{path}/train_indices.txt', 'w') as file:
         file.write('\n'.join(map(str, train_indices)))
