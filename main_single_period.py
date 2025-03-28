@@ -73,10 +73,12 @@ def period_simulation_framework(env_json=None, cur_period: int=0, events=[]):
     # setup the environment
     im_env, env_config = create_supply_chain_environment(env_json=env_json, cur_period=cur_period)
     # create the agents
+    stage_agents = None
     if LLM_AGENT_NAME == "gpt":
-        stage_agents, user_proxy = create_gpt_agents(env_config["stage_names"], env_config["num_agents_per_stage"], llm_config={"config_list": llm_config_list})
+        stage_agents, user_proxy = create_gpt_agents(env_config["stage_names"], env_config["max_num_agents_per_stage"], llm_config={"config_list": llm_config_list})
     elif LLM_AGENT_NAME == "llama":
-        stage_agents = create_llama_agents(env_config["num_stages"], env_config["num_agents_per_stage"])
+        stage_agents = create_llama_agents(env_config["num_stages"], env_config["max_num_agents_per_stage"])
+        pass
     
     if env_json is not None: # the env has been running.      
         print("calculate the env update, rewards, etc")

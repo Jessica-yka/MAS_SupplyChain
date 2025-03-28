@@ -173,7 +173,7 @@ class SupplyChainMASDataset(Dataset):
         self.graph_type = 'Contextualized Supply Chain Graph in the multi-agent system'
         self.type = 'sc_mas'
         self.num_stages = env.num_stages
-        self.num_agents_per_stage = env.num_agents_per_stage
+        self.max_num_agents_per_stage = env.max_num_agents_per_stage
         self.env = env
         self.event_dict = {"events": [x[0] for x in events[1:]],
                             "Type": [x[1] for x in events[1:]],
@@ -181,6 +181,7 @@ class SupplyChainMASDataset(Dataset):
                             "id": [x[3] for x in events[1:]],
                             }
         self.index_lm_model = 'sbert'
+        self.index = 0
 
     def __len__(self):
         """Return the len of the dataset."""
@@ -192,9 +193,9 @@ class SupplyChainMASDataset(Dataset):
             'num_stages': env.num_stages,
             'demands': env.demands,
             't': env.period,
-            'num_agents_per_stage': env.num_agents_per_stage,
-            'inventories': env.inventories[:, :, env.period], # num_stages * num_agents_per_stage
-            'lead_times': env.lead_times, # num_stages * num_agents_per_stage * num_agents_per_stage
+            'max_num_agents_per_stage': env.max_num_agents_per_stage,
+            'inventories': env.inventories[:, :, env.period], # num_stages * max_num_agents_per_stage
+            'lead_times': env.lead_times, # num_stages * max_num_agents_per_stage * max_num_agents_per_stage
             'prod_capacities': env.prod_capacities,
             'arriving_orders': env.arriving_orders,
             'sale_prices': env.sale_prices,
@@ -214,14 +215,15 @@ class SupplyChainMASDataset(Dataset):
     def convert_env_to_node_df(self, env: dict, event_dict: dict):
 
         num_stages = env['num_stages']
-        num_agents_per_stage = env['num_agents_per_stage']
+        max_num_agents_per_stage = env['max_num_agents_per_stage']
         stage_names = env['stage_names']
         num_current_events = len(env['events'])
-        num_nodes = 1 + num_stages * num_agents_per_stage + num_current_events
-        df_node = pd.DataFrame(index=range(num_nodes), columns=["node_id", "type"])
-        df_node["node_id"] = np.arange(num_nodes).tolist()
-        df_node["name"] = ["Customers"] + [f"stage_{m}_agent_{x}" for m in range(num_stages) for x in range(num_agents_per_stage)] + [event_dict['events'][eidx] for eidx in env['events'].keys()]
-        df_node["type"] = ["customers"] + [stage_names[m] for m in range(num_stages) for x in range(num_agents_per_stage)] + ["event" for _ in range(num_current_events)]
+        # num_nodes = 1 + num_stages * max_num_agents_per_stage + num_current_events
+        # df_node = pd.DataFrame(columns=["node_id", "type"])
+        # df_node["node_id"] = np.arange(num_nodes).tolist()
+        df_node = pd.DataFrame()
+        df_node["name"] = ["Customers"] + [f"stage_{m}_agent_{x}" for m in range(num_stages) for x in range(max_num_agents_per_stage)] + [event_dict['events'][eidx] for eidx in env['events'].keys()]
+        df_node["type"] = ["customers"] + [stage_names[m] for m in range(num_stages) for x in range(max_num_agents_per_stage)] + ["event" for _ in range(num_current_events)]
         df_node['sale_price'] = [0] + env['sale_prices'].flatten().tolist() + [0 for _ in range(num_current_events)]
         df_node['prod_capacity'] = [0] + env['prod_capacities'].flatten().tolist() + [0 for _ in range(num_current_events)]
         df_node['prod_cost'] = [0] + env['prod_costs'].flatten().tolist() + [0 for _ in range(num_current_events)]
@@ -230,17 +232,17 @@ class SupplyChainMASDataset(Dataset):
         df_node['inventory'] = [0] + env['inventories'].flatten().tolist() + [0 for _ in range(num_current_events)]
         df_node['backlog'] = [0] + env['backlog'].flatten().tolist() + [0 for _ in range(num_current_events)]
         # df_node['upstream_backlog'] = [0] + env['upstream_backlog'].flatten().tolist() + [0 for _ in range(num_current_events)]
-        df_node['stage_id'] = [-1] + [m for m in range(num_stages) for _ in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
-        df_node['agent_id'] = [-1] + [x for _ in range(num_stages) for x in range(num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
+        df_node['stage_id'] = [-1] + [m for m in range(num_stages) for _ in range(max_num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
+        df_node['agent_id'] = [-1] + [x for _ in range(num_stages) for x in range(max_num_agents_per_stage)] + [-1 for _ in env['events'].keys()]
         df_node['running_status'] = [1] + env['running_agents'].flatten().tolist() + [1 for _ in range(num_current_events)]
         df_node = df_node[df_node['running_status'] == 1].reset_index(drop=True)
-
+        df_node['node_id'] = df_node.index
         return df_node
 
     def convert_env_to_edge_df(self, env: dict, event_dict: dict, target_stage_idx: int, target_agent_idx: int):
         # TODO: check if the order is updated before the agents are queried.
         num_stages = env['num_stages']
-        num_agents_per_stage = env['num_agents_per_stage']
+        max_num_agents_per_stage = env['max_num_agents_per_stage']
         # num_init_suppliers = env['num_init_suppliers']
         sup_rel = env['supply_relations']
         # order_fulfill_rates = env['order_fulfill_rates']
@@ -255,14 +257,14 @@ class SupplyChainMASDataset(Dataset):
                     ['Customers', f"stage_{target_stage_idx}_agent_{target_agent_idx}", f"order {num_unit} units of product at period {t} from", "", []]
             edge_idx += 1
         else:
-            for customer_agent_idx in range(num_agents_per_stage):
+            for customer_agent_idx in range(max_num_agents_per_stage):
                 num_unit = env['orders'][target_stage_idx-1][customer_agent_idx][target_agent_idx][t]
                 if num_unit > 0:
                     df_edge.loc[edge_idx, ["source", "target", "label", "type", "aspect"]] = \
                         [f"stage_{target_stage_idx-1}_agent_{customer_agent_idx}", f"stage_{target_stage_idx}_agent_{target_agent_idx}", f"order {num_unit} units of product at period {t} from", "", []]
                     edge_idx += 1
         # record the order made by the target to the upstream
-        for supplier_agent_idx in range(num_agents_per_stage):
+        for supplier_agent_idx in range(max_num_agents_per_stage):
             lt = env['lead_times'][target_stage_idx][target_agent_idx][supplier_agent_idx]
             for day in range(np.min([lt, t])):
                 num_unit = env['orders'][target_stage_idx][target_agent_idx][supplier_agent_idx][day] # TODO: how to get the recent orders
@@ -287,41 +289,54 @@ class SupplyChainMASDataset(Dataset):
 
         # Keep the record of the supply relations
         for m in range(num_stages-1):
-            for x in range(num_agents_per_stage):
-                for i in range(num_agents_per_stage):
+            for x in range(max_num_agents_per_stage):
+                if env["running_agents"][m][x] != 1:
+                    continue
+                for i in range(max_num_agents_per_stage):
+                    if env["running_agents"][m+1][i] != 1:
+                        continue
                     if sup_rel[m][x][i] == 1:
                         df_edge.loc[edge_idx, ["source", "target", "label", 'type', 'aspect']] = \
                             [f"stage_{m+1}_agent_{i}", f"stage_{m}_agent_{x}", "is the supplier of", "", []]
                         edge_idx += 1
 
         # add arriving deliveries information
-        for supp_idx in range(self.num_agents_per_stage):
-            lt = env['lead_times'][target_stage_idx][target_agent_idx][supp_idx]
-            if t > lt:
-                arriving_orders = env['arriving_orders'][target_stage_idx, target_agent_idx, supp_idx, (t - lt + 1):(t + 1)]
-            elif t > 0:
-                arriving_orders = env['arriving_orders'][target_stage_idx, target_agent_idx, supp_idx, 1:(t+1)]
-            if t > 0:
-                for day, num_units in enumerate(arriving_orders[::-1]):
-                    if num_units > 0:
-                        df_edge.loc[edge_idx, ["source", "target", "label", "type", "aspect"]] = \
-                        [f"stage_{target_stage_idx+1}_agent_{supp_idx}", f"stage_{target_stage_idx}_agent_{target_agent_idx}", f"deliverying {num_units} units of product in {lt-day} days", "", []]
-                        edge_idx += 1
+        if m < num_stages-1:
+            for supp_idx in range(self.max_num_agents_per_stage):
+                if env["running_agents"][m+1][supp_idx] != 1:
+                    continue
+                lt = env['lead_times'][target_stage_idx][target_agent_idx][supp_idx]
+                if t > lt:
+                    arriving_orders = env['arriving_orders'][target_stage_idx, target_agent_idx, supp_idx, (t - lt + 1):(t + 1)]
+                elif t > 0:
+                    arriving_orders = env['arriving_orders'][target_stage_idx, target_agent_idx, supp_idx, 1:(t+1)]
+                if t > 0:
+                    for day, num_units in enumerate(arriving_orders[::-1]):
+                        if num_units > 0:
+                            df_edge.loc[edge_idx, ["source", "target", "label", "type", "aspect"]] = \
+                            [f"stage_{target_stage_idx+1}_agent_{supp_idx}", f"stage_{target_stage_idx}_agent_{target_agent_idx}", f"deliverying {num_units} units of product in {lt-day} days", "", []]
+                            edge_idx += 1
        
         # add lead time info to the edge_df
         for stage_id in range(num_stages-1):
-            for agent_id in range(num_agents_per_stage):
-                for supp_idx in range(num_agents_per_stage):
+            for agent_id in range(max_num_agents_per_stage):
+                if env['running_agents'][stage_id][agent_id] != 1:
+                    continue
+                for supp_idx in range(max_num_agents_per_stage):
+                    if env["running_agents"][stage_id+1][supp_idx] != 1:
+                        continue
                     lt = env['lead_times'][stage_id][agent_id][supp_idx]
                     df_edge.loc[edge_idx, ["source", "target", "label", "type", "aspect"]] = \
                             [f"stage_{stage_id+1}_agent_{supp_idx}", f"stage_{stage_id}_agent_{agent_id}", f"has lead time of {lt} days to", "", []]
                     edge_idx += 1
+
 
         return df_edge
 
     def retrieve_subgraph(self, df_nodes, df_edges, target_node, G, question_type):
 
         df_sub_nodes = get_sub_df_nodes(df_nodes=df_nodes, target_node=target_node)
+        node_id_name_map = dict(zip(df_sub_nodes['node_id'].tolist(), df_sub_nodes['name'].tolist()))
         if question_type == "order placement":
             # only retrieve the relation with downstream agents from the df_edges
             df_demand_edges = get_demand_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
@@ -338,7 +353,7 @@ class SupplyChainMASDataset(Dataset):
         # Remove duplicate edges in df_sub_edges
         df_sub_edges = df_sub_edges.drop_duplicates(subset=['src', 'edge_attr', 'dst', 'src_name', 'dst_name']).reset_index(drop=True)
 
-        return df_sub_nodes, df_sub_edges
+        return df_sub_nodes, df_sub_edges, node_id_name_map
 
 
     def generate_text_embedding(self, nodes: pd.DataFrame, edges: pd.DataFrame):
@@ -363,17 +378,17 @@ class SupplyChainMASDataset(Dataset):
         df_edges = self.convert_env_to_edge_df(env=env, event_dict=self.event_dict, target_stage_idx=target_stage_idx, target_agent_idx=target_agent_idx) # TODO: need to write an aggregated one. To figure out the replacement of event_dict
         df_edges.to_csv(f"df_edges_stage_{target_stage_idx}_agent_{target_agent_idx}.csv", index=False)
         G = build_supplier_graph(df_edges=df_edges, df_nodes=df_nodes)
-        df_nodes, df_edges = self.retrieve_subgraph(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node, G=G, question_type=question_type)
+        df_nodes, df_edges, node_id_name_map = self.retrieve_subgraph(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node, G=G, question_type=question_type)
         graph = self.generate_text_embedding(nodes=df_nodes, edges=df_edges)
         desc = df_nodes[['node_id', 'node_attr']].to_csv(index=False)+'\n'+df_edges[['src', 'edge_attr', 'dst']].to_csv(index=False)
 
-        return desc, graph
+        return desc, graph, node_id_name_map
     
 
     def __getitem__(self, stage_idx: int, agent_idx: int, question_type: str):
 
         target_node = f"stage_{stage_idx}_agent_{agent_idx}"
-        desc, graph = self.preprocess(target_stage_idx=stage_idx, target_agent_idx=agent_idx, question_type=question_type)
+        desc, graph, node_id_name_map = self.preprocess(target_stage_idx=stage_idx, target_agent_idx=agent_idx, question_type=question_type)
         if question_type == "order placement":
             prompt = (f"You are {target_node} in the supply chain at round . Given the current state of the supply chain, answer the following question:\n\n"
                     f"Question: Considering the your inventory level, orders/demand from the downstream customers and lead times to the suppliers, how many orders would you like to place to your supplier in this round? Answer in the form of a number. "
@@ -383,15 +398,17 @@ class SupplyChainMASDataset(Dataset):
                     f"Question: Considering the price, lead time and order fulfillment, who you would choose as your supplier in the next round? Answer the node id of your choice."
                     )
         # print(desc)
+        self.index += 1
         return {
-            'id': stage_idx*self.num_agents_per_stage+agent_idx,
+            'id': self.index-1,
             'label': None,
             'stage_idx': stage_idx,
             'agent_idx': agent_idx,
             'desc': desc,
             'graph': graph,
             'question': prompt,
-            'question_type': question_type
+            'question_type': question_type,
+            "node_id_name_map": node_id_name_map,
         }
 
     

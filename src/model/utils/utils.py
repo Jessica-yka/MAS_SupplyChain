@@ -10,21 +10,6 @@ from typing import Callable
 import pickle
 
 
-def split_demand(demand: int, num_suppliers: int, num_agents_per_stage: int):
-    """split the demand over multiple suppliers, with variation on #suppliers"""
-    num_suppliers = np.random.normal(num_suppliers, 1, 1)[0]
-    num_suppliers = max(1, int(num_suppliers))
-
-    cand_suppliers = abs(np.random.uniform(0, 1, num_agents_per_stage))
-    supp_idx = np.random.choice(a=num_agents_per_stage, size=num_suppliers)
-    supp_mask = np.zeros(num_agents_per_stage)
-    supp_mask[supp_idx] = 1
-    cand_suppliers *= supp_mask
-    cand_suppliers /= sum(cand_suppliers)
-    cand_suppliers *= demand
-    demands = cand_suppliers.astype(int)
-
-    return demands.tolist()
 
 def save_chat_history_to_file(data: str, save_path: str, t: int, round: int=0):
     print("Saving data to: ", f"results/{save_path}/chat_results/chat_summary_round{round}_period{t}.txt")
@@ -150,10 +135,11 @@ def load_action_dicts(env_config: str):
 def draw_multipartite_graph(env, t: int, save_prefix: str):
 
     num_stages = env.num_stages
-    num_agents_per_stage = env.num_agents_per_stage
+    max_num_agents_per_stage = env.max_num_agents_per_stage
     sup_rel = env.supply_relations
     dem_rel = env.demand_relations
     save_path = f'results/{save_prefix}/'
+    running_agents = env.running_agents
 
     M = nx.DiGraph()
 
@@ -161,15 +147,21 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
     stage_agents = []
     for m in range(num_stages):
         stage_agents = []
-        for x in range(num_agents_per_stage):
+        for x in range(max_num_agents_per_stage):
+            if running_agents[m][x] == -1:
+                continue
             stage_agents.append(f"s{m}a{x}")
         M.add_nodes_from(stage_agents, layer=num_stages-m)  # Add set A nodes
 
     # Add edges between the sets
     edges = []
     for m in range(num_stages-1):
-        for x in range(num_agents_per_stage):
-            for i in range(num_agents_per_stage):
+        for x in range(max_num_agents_per_stage):
+            if running_agents[m][x] == -1:
+                continue
+            for i in range(max_num_agents_per_stage):
+                if running_agents[m+1][i] == -1:
+                    continue
                 if sup_rel[m][x][i] == 1:
                     src = f"s{m+1}a{i}"
                     tgt = f"s{m}a{x}"
@@ -181,13 +173,13 @@ def draw_multipartite_graph(env, t: int, save_prefix: str):
 
     # Draw the multipartite graph
     # stage_colors = plt.cm.plasma(np.linspace(0, 1, 4))
-    stage_colors = ["gold", "violet", "limegreen", "darkorange", "red", "green", "black"]
-    colors = [stage_colors[m] for m in range(num_stages) for _ in range(num_agents_per_stage)]
+    stage_colors = ["gold", "violet", "limegreen", "darkorange", "red", "green", "black", "pink"]
+    colors = [stage_colors[m] for m in range(num_stages) for x in range(max_num_agents_per_stage) if env.running_agents[m][x] > -1]
     # mask closed agents
     for m in range(num_stages):
-        for x in range(num_agents_per_stage):
+        for x in range(max_num_agents_per_stage):
             if env.running_agents[m][x] == 0:
-                colors[m*num_agents_per_stage+x] = "black"
+                colors[m*max_num_agents_per_stage+x] = "black"
 
     plt.figure(figsize=(15, 10))
     nx.draw(M, pos, with_labels=True, node_color=colors, node_size=200, font_size=12, edge_color="gray", alpha=1)
@@ -202,7 +194,7 @@ def visualize_state(env, t: int, save_prefix: str):
     # env.update_state_on_t(env.period-1)
     state_dict = env.state_dict
     num_stages = env.num_stages
-    num_agents_per_stage = env.num_agents_per_stage
+    max_num_agents_per_stage = env.max_num_agents_per_stage
     lt_max = env.max_lead_time
     save_path = f'results/{save_prefix}/'
     xy_locations = np.load(f'env/{save_prefix}/xy_locations.npy')
@@ -231,9 +223,11 @@ def visualize_state(env, t: int, save_prefix: str):
         "location": {},
     })
     for stage in range(num_stages):
-        for agent in range(num_agents_per_stage):
+        for agent in range(max_num_agents_per_stage):
+            if env.running_agents[stage][agent] == -1:
+                continue
             if stage == 0:
-                demand = env.demands[env.period]
+                demand = env.demands[agent, env.period]
             else:
                 demand = 0
             df = pd.concat([df, pd.DataFrame({
@@ -282,16 +276,6 @@ def visualize_state(env, t: int, save_prefix: str):
     draw_multipartite_graph(env=env, t=t, save_prefix=save_prefix)
     # draw_material_flow(env=env, t=t, save_prefix=save_prefix)
     return df.to_json(orient='records', indent=4)
-
-def add_xy_locations_to_env_json(env_json: dict, xy_location_path: str, num_stages: int, num_agents_per_stage: int) -> dict:
-    # Load the xy_locations.npy file
-    xy_locations = np.load(xy_location_path)
-    
-    for m in range(num_stages):
-        for x in range(num_agents_per_stage):
-            env_json[m*num_agents_per_stage+x]['xy_location'] = xy_locations[m][x].tolist()
-    
-    return env_json
 
 
 def random_relations(n_cand: int, n_relation: int):

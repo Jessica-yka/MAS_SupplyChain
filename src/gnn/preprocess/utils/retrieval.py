@@ -187,7 +187,6 @@ def get_sub_df_nodes(df_nodes: pd.DataFrame, target_node: str, path: str=None):
 def visualize_contextualized_supply_chain_subgraph(env: dict, df_edges: pd.DataFrame, df_nodes: pd.DataFrame, target_node: str, path: str):
 
     num_stages = env['num_stages']
-    num_agents_per_stage = env['num_agents_per_stage']
     stage_name_id = dict(zip(env['stage_names'], range(num_stages)))
     M = nx.DiGraph()
 

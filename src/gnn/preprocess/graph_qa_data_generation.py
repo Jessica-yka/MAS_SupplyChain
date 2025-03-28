@@ -20,7 +20,7 @@ import json
 sys.path.append('/data/yanjia/MAS_SupplyChain')
 # sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from src.model.config import env_configs_list
-from src.model.utils.utils import clear_dir, split_demand, save_data_to_json, read_data_from_json
+from src.model.utils.utils import clear_dir, save_data_to_json, read_data_from_json
 from src.model.data_simulation import generate_lead_time, generate_prod_capacity, generate_backlogs
 from src.model.data_simulation import generate_cost_price, generate_sup_dem_relations
 from src.model.data_simulation import generate_holding_costs, generate_backlog_costs, generate_init_inventories

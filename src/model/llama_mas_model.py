@@ -231,7 +231,7 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
     total_chat_summary = ""
     # emergent_events = im_env.emergent_events.get(period, {'events': [], 'affected_agents': []})
     num_stages = im_env.num_stages
-    num_agents_per_stage = im_env.num_agents_per_stage
+    max_num_agents_per_stage = im_env.max_num_agents_per_stage
     llm_agent_set = im_env.llm_agent_set
     enable_graph_change = im_env.enable_graph_change
     enable_price_change = im_env.enable_price_change
@@ -242,24 +242,25 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
     with open("testing_llama_mas_question_formulation.csv", "w") as f:
         for stage_id in range(num_stages):
             mas_dataset = []
-            for agent_id in range(num_agents_per_stage):                
+            for agent_id in range(max_num_agents_per_stage):                
                 if im_env.running_agents[stage_id][agent_id] == 0:
-                    action_sup_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(num_agents_per_stage, dtype=int)
-                    action_order_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(num_agents_per_stage, dtype=int)  
-                    action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = 0
-                elif (stage_id, agent_id) in llm_agent_set: # just to have only a few agents in the environment to be controlled by LLM
-                    # stage_state = state_dict[f'stage_{stage_id}_agent_{agent_id}']
-                    mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'order placement'))
-                    if enable_graph_change and stage_id < num_stages - 1:
-                        mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'supplier selection'))
-                else:
-                    action_sup_dict, action_order_dict, action_price_dict = im_env.no_backlog_env_proxy(stage_id=stage_id, agent_id=agent_id, action_order_dict=action_order_dict, 
-                                                                                                    action_sup_dict=action_sup_dict, action_price_dict=action_price_dict)
-
-
-            mas_test_loader = DataLoader(mas_dataset, batch_size=int(num_agents_per_stage), drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
+                    action_sup_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(max_num_agents_per_stage, dtype=int)
+                    action_order_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(max_num_agents_per_stage, dtype=int)  
+                    # action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = 0
+                elif im_env.running_agents[stage_id][agent_id] == 1:
+                    if llm_agent_set[stage_id][agent_id]: # just to have only a few agents in the environment to be controlled by LLM
+                        # stage_state = state_dict[f'stage_{stage_id}_agent_{agent_id}']
+                        mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'order placement'))
+                        if enable_graph_change and stage_id < num_stages - 1:
+                            mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'supplier selection'))
+                    else:
+                        action_sup_dict, action_order_dict, action_price_dict = im_env.no_backlog_env_proxy(stage_id=stage_id, agent_id=agent_id, action_order_dict=action_order_dict, 
+                                                                                                        action_sup_dict=action_sup_dict, action_price_dict=action_price_dict)
+                else: # non-active agents (i.e., running_agents == -1)
+                    pass
+            mas_test_loader = DataLoader(mas_dataset, batch_size=int(max_num_agents_per_stage), drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
             for i, batch in enumerate(mas_test_loader):
-                df = pd.DataFrame({"id": [], "pred": [], "label": [], "question": [], "desc": []})
+                df = pd.DataFrame({"id": [], "pred": [], "label": [], "question": [], "desc": [], 'stage_idx': [], 'agent_idx': [], 'question_type': []})
                 with torch.no_grad():
                     output = model.inference(batch)
                     df = pd.concat([df, pd.DataFrame(output)], axis=0)
@@ -268,21 +269,22 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
                         f.write(json.dumps(dict(row)) + "\n")
 
                 # Separate data with odd index (order amount) and even index (supplier id)
-                df['ans'] = df['pred'].apply(lambda x: int(re.search(r'\b\d+\b', x).group()) if re.search(r'\b\d+\b', x) else None)
+                df['ans'] = df['pred'].apply(lambda x: int(re.search(r'\b\d+\b', x).group()) if re.search(r'\b\d+\b', x) else 0)
                 df['ans'] = df['ans'].astype(int)
 
                 for row_index, row in df.iterrows():
                     stage_idx, agent_idx = int(row['stage_idx']), int(row['agent_idx'])
                     question_type = row['question_type']
+                    node_id_name_map = mas_dataset[row_index]['node_id_name_map']
                     cur_supp_relation = im_env.supply_relations[stage_idx][agent_idx]
                     if question_type == 'order placement':
                         action_order_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = row['ans'] * cur_supp_relation
 
                     if question_type == 'supplier selection':
-                        
-                        supp_stage_idx, supp_agent_idx = int(row['ans'])//num_agents_per_stage, int(row['ans'])%num_agents_per_stage
+                        supplier_name = node_id_name_map[int(row['ans'])]
+                        _, supp_stage_idx, _, supp_agent_idx = supplier_name.split('_')
                         if supp_stage_idx == stage_idx + 1: # check if the supplier is in the next stage
-                            supp_relation = np.zeros(num_agents_per_stage, dtype=int)
+                            supp_relation = np.zeros(max_num_agents_per_stage, dtype=int)
                             supp_relation[supp_agent_idx] = 1
                             action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = supp_relation
                         else:
@@ -291,7 +293,11 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
             # update env per stage
             im_env.update_action_to_env(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict, price_dict=action_price_dict)
 
+    # Sort the action_order_dict by keys
+    action_order_dict = dict(sorted(action_order_dict.items()))
+    action_sup_dict = dict(sorted(action_sup_dict.items()))
     print(action_order_dict)
+    print("\n")
     print(action_sup_dict)
     save_chat_history_to_file(data=total_chat_summary, save_path=config_name, t=period)
 

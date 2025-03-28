@@ -111,13 +111,15 @@ def generate_cost_price(prod_cost_dist: dict, profit_rate_dist: dict, num_stages
 
 
 def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage: int, \
-                               num_suppliers: int=1, num_customers: int=1):
-    supply_relations = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int) # who are my suppliers
-    demand_relations = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int) # who are my customers
+                               num_suppliers: int=1, num_customers: int=1, max_num_agents_per_stage: int=None):
+    if max_num_agents_per_stage is None:
+        max_num_agents_per_stage = num_agents_per_stage
+    supply_relations = np.zeros((num_stages, max_num_agents_per_stage, max_num_agents_per_stage), dtype=int) # who are my suppliers
+    demand_relations = np.zeros((num_stages, max_num_agents_per_stage, max_num_agents_per_stage), dtype=int) # who are my customers
     # Generate supply relations
     if type == "fix":
         for m in range(num_stages):
-            for x in range(num_agents_per_stage):
+            for x in range(max_num_agents_per_stage):
                 if m == 0: 
                     supply_relations[m][x][x] = 1
                     demand_relations[m][x][x] = 1
@@ -127,12 +129,16 @@ def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage:
                     supply_relations[m][x][x] = 1
     elif type == "random":
         for m in range(num_stages):
-            for x in range(num_agents_per_stage):
+            for x in range(max_num_agents_per_stage):
                 if m == 0:
                     demand_relations[m][x][x] = 1
-                    
-                suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
-                supply_relations[m][x][suppliers_idx] = 1
+                    suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
+                    supply_relations[m][x][suppliers_idx] = 1
+                elif m == num_stages-1:
+                    supply_relations[m][x][x] = 1
+                else:
+                    suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
+                    supply_relations[m][x][suppliers_idx] = 1
     else:
         raise AssertionError(f"{type} relation function is not implemented.")
     
