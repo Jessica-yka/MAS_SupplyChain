@@ -197,6 +197,7 @@ if __name__ == '__main__':
     df_demand_qa = pd.read_csv(f'{path}/all_demand_questions.csv')
     num_demand_qa = len(df_demand_qa)
 
+<<<<<<< Updated upstream
     generate_text_embedding(require_retrieval=require_retrieval)
 
     # Ensure reproducibility by setting a random seed
@@ -207,5 +208,18 @@ if __name__ == '__main__':
         generate_split(num_price_qa, f'{path}/split/price_qa')
         generate_split(num_lead_time_qa, f'{path}/split/lead_time_qa')
         generate_split(num_demand_qa, f'{path}/split/demand_qa')
+=======
+    # generate_text_embedding(path=path, require_retrieval=require_retrieval)
+
+    # Ensure reproducibility by setting a random seed
+    random.seed(42)
+    # if for_train:
+
+        # generate_split(num_events_qa, f'{path}/split/events_qa')
+    #     generate_split(num_order_fulfill_qa, f'{path}/split/order_fulfill_qa')
+    #     generate_split(num_price_qa, f'{path}/split/price_qa')
+    #     generate_split(num_lead_time_qa, f'{path}/split/lead_time_qa')
+    #     generate_split(num_demand_qa, f'{path}/split/demand_qa')
+>>>>>>> Stashed changes
 
     print("Done!")
