@@ -40,11 +40,24 @@ def serve_json_file(request, path):
     except Exception as e:
         return JsonResponse({'error': str(e)}, status=500)
 
+def serve_js_file(request, path):
+    try:
+        js_path = settings.BASE_DIR / 'dist/lang' / path
+        if not os.path.exists(js_path):
+            return HttpResponse(status=404)
+            
+        with open(js_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        return HttpResponse(content, content_type='application/javascript')
+    except Exception as e:
+        return HttpResponse(str(e), status=500)
+
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('hello/', views.hello_world, name='hello_world'),
     path('print_post/', views.print_post, name='print_post'),
     path('next_step/', views.next_step, name='next_step'),
+    path('chat/', views.chat, name='chat'),
     
     # 添加数据文件路由（移到静态文件路由前面）
     re_path(r'^test_data/(?P<path>.*)$', serve_json_file),
@@ -53,10 +66,30 @@ urlpatterns = [
     re_path(r'^assets/(?P<path>.*)$', serve, {
         'document_root': settings.BASE_DIR / 'dist/assets'
     }),
+    
+    # 添加图片文件路由
+    re_path(r'^imgs/(?P<path>.*)$', serve, {
+        'document_root': settings.BASE_DIR / 'dist/imgs'
+    }),
+    re_path(r'^gif/(?P<path>.*)$', serve, {
+        'document_root': settings.BASE_DIR / 'dist/gif'
+    }),
+    
+    # 添加语言文件路由
+    # 修改语言文件路由，使用 serve_js_file 处理函数
+    re_path(r'^lang/(?P<path>.*)$', serve_js_file),  # 注意这里改成 lang 而不是 langdist
+    
+    # 删除或注释掉这个旧的路由
+    # re_path(r'^langdist/(?P<path>.*)$', serve, {
+    #     'document_root': settings.BASE_DIR / 'dist/lang'
+    # }),
+    
+    # 添加 i18n 语言文件路由
+    re_path(r'^locales/(?P<path>.*)$', serve, {
+        'document_root': settings.BASE_DIR / 'dist/locales'
+    }),
+    
+    # 确保这些路由在通配符路由之前
     path('', TemplateView.as_view(template_name='index.html')),
-]
-
-# 确保在最后添加通配符路由
-urlpatterns += [
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),
 ]

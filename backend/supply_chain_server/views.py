@@ -56,20 +56,21 @@ def next_step(request):
             print(f"当前周期: {period}")
             print(f"当前事件: {events}")
 
-            # 开发模式的假数据
-            # fake_data_path = f'/home/vislab/Yanjia/MAS_SupplyChain/backend/fake_data/env_period_0.json'
-
-            # with open(fake_data_path, 'r') as f:
-            #     result = json.load(f)
-
             # 运行模式
             # 在调用 period_simulation_framework 之前设置默认参数
             sys.argv = [sys.argv[0]]  # 清除所有命令行参数，只保留脚本名
+
+            # 开发模式的假数据
+            fake_data_path = f'/home/vislab/Yanjia/MAS_SupplyChain/backend/fake_data/env_period_0.json'
+
+            with open(fake_data_path, 'r') as f:
+                result = json.load(f)
             
-            if period == -1:
-                result = period_simulation_framework(env_json=None, cur_period=0, events=events)
-            else:
-                result = period_simulation_framework(env_json=agents, cur_period=period+1, events=events)
+            # 运行模式
+            # if period == -1:
+            #     result = period_simulation_framework(env_json=None, cur_period=0, events=events)
+            # else:
+            #     result = period_simulation_framework(env_json=agents, cur_period=period+1, events=events)
                 
             return JsonResponse(result, safe=False)
                 
@@ -78,3 +79,31 @@ def next_step(request):
             return JsonResponse({"error": "Invalid data"}, status=400)
     else:
         return JsonResponse({"error": "Method not allowed"}, status=405)
+
+@csrf_exempt
+def chat(request):
+    if request.method == 'POST':
+        try:
+            # 获取POST的数据
+            data = json.loads(request.body)
+            # 打印到控制台
+            print("Received POST data:", data)
+            # call the chat function
+            # data = function here
+            time.sleep(1)
+            # 返回响应
+            return JsonResponse({
+                "status": "success",
+                "message": "Data received",
+                "data": data
+            })
+        except json.JSONDecodeError:
+            return JsonResponse({
+                "status": "error",
+                "message": "Invalid JSON data"
+            }, status=400)
+    else:
+        return JsonResponse({
+            "status": "error",
+            "message": "Only POST method is allowed"
+        }, status=405)

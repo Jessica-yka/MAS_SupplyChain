@@ -124,8 +124,8 @@ STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 STATICFILES_DIRS = [
     BASE_DIR / 'dist',  # Vue 打包的根目录
-    BASE_DIR / 'dist/static',  # 添加这行，指向 Vue 的静态资源目录
-    # BASE_DIR / 'dist/assets',  # 保留这个以防万一
+    BASE_DIR / 'dist/static',  # Vue 的静态资源目录
+    BASE_DIR / 'dist/lang',  # 添加语言文件目录
 ]
 
 # 添加数据文件路径配置
@@ -147,7 +147,7 @@ CORS_ALLOW_CREDENTIALS = True
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:8000",
     "http://127.0.0.1:8000",
-    "http://143.89.76.77:8000",
+    "http://143.89.76.77:8000", # 添加 Vite 开发服务器地址
 ]
 
 CORS_ALLOW_METHODS = [
