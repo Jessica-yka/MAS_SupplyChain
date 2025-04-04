@@ -239,7 +239,7 @@ def visualize_state(env, t: int, save_prefix: str):
             next_supplier = np.argmax(state_dict[f'stage_{stage}_agent_{agent}'][9]) # supply_relation
             print("next supplier is", next_supplier)
             supply_relation_summary[next_supplier] = 2
-            cur_supplier = [i for i in range(num_avail_upstream) if state_dict[f'stage_{stage}_agent_{agent}'][15][i]==1] # order
+            cur_supplier = [i for i in range(num_avail_upstream) if state_dict[f'stage_{stage}_agent_{agent}'][15][i]>0] # order
             print("current supplier is", cur_supplier)
             supply_relation_summary[cur_supplier] = 1
             total_deliveries = np.sum(state_dict[f'stage_{stage}_agent_{agent}'][12], axis=-1)
