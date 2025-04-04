@@ -126,6 +126,7 @@ STATICFILES_DIRS = [
     BASE_DIR / 'dist',  # Vue 打包的根目录
     BASE_DIR / 'dist/static',  # Vue 的静态资源目录
     BASE_DIR / 'dist/lang',  # 添加语言文件目录
+    BASE_DIR / 'dist/fonts',  # 添加字体文件目录
 ]
 
 # 添加数据文件路径配置

@@ -37,7 +37,7 @@ from src.model.env import env_creator
 from src.model.config import env_configs_list, get_env_configs
 from src.model.utils.utils import clear_dir
 from utils.utils import visualize_state, save_chat_history_to_file, update_sup_action
-from utils.utils import read_data_from_json, save_data_to_json, load_all_action_dicts, load_action_dicts
+from utils.utils import read_data_from_json, save_data_to_json, load_all_action_dicts, load_action_dicts, stage_agent_id2name
 
 
 def create_agents(num_stages: int, num_agents_per_stage: int) -> List[AutoModelForCausalLM]:
@@ -47,8 +47,11 @@ def create_agents(num_stages: int, num_agents_per_stage: int) -> List[AutoModelF
     # Build Model
     args.llm_model_path = llama_model_path[args.llm_model_name]
     # Load pretrained LLAMA model
+    print("loading model from", args.llm_model_path)
+    print('load model', args.model_name)
     model = load_llm_model[args.model_name](graph_type='Contextualized Supply Chain Graph', args=args) 
-    model = _reload_best_model(model, args)
+    if args.model_name == "graph_llm":
+        model = _reload_best_model(model, args)
     agents.append(model)
 
     return agents
@@ -239,7 +242,9 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
     recovery_list = None
 
     sc_mas_dataset = SupplyChainMASDataset(env=im_env)
-    with open("testing_llama_mas_question_formulation.csv", "w") as f:
+    with open("testing_llama_mas_question_formulation.csv", "a+") as f:
+        if f.tell() == 0:  # Check if the file is empty
+            f.write("id,pred,label,question,desc,stage_idx,agent_idx,question_type\n")  # Write header if file is empty
         for stage_id in range(num_stages):
             mas_dataset = []
             for agent_id in range(max_num_agents_per_stage):                
@@ -247,7 +252,7 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
                     action_sup_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(max_num_agents_per_stage, dtype=int)
                     action_order_dict[f"stage_{stage_id}_agent_{agent_id}"] = np.zeros(max_num_agents_per_stage, dtype=int)  
                     # action_price_dict[f"stage_{stage_id}_agent_{agent_id}"] = 0
-                elif im_env.running_agents[stage_id][agent_id] == 1:
+                elif im_env.running_agents[stage_id][agent_id] == 1 and not (stage_id>0 and sum(im_env.orders[stage_id-1, :, agent_id, im_env.period]) == 0): # active agents has downstream demand
                     if llm_agent_set[stage_id][agent_id]: # just to have only a few agents in the environment to be controlled by LLM
                         # stage_state = state_dict[f'stage_{stage_id}_agent_{agent_id}']
                         mas_dataset.append(sc_mas_dataset.__getitem__(stage_id, agent_id, 'order placement'))
@@ -265,12 +270,12 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
                     output = model.inference(batch)
                     df = pd.concat([df, pd.DataFrame(output)], axis=0)
 
-                    for _, row in df.iterrows():
-                        f.write(json.dumps(dict(row)) + "\n")
-
                 # Separate data with odd index (order amount) and even index (supplier id)
                 df['ans'] = df['pred'].apply(lambda x: int(re.search(r'\b\d+\b', x).group()) if re.search(r'\b\d+\b', x) else 0)
                 df['ans'] = df['ans'].astype(int)
+
+                for _, row in df.iterrows():
+                    f.write(json.dumps(dict(row)) + "\n")
 
                 for row_index, row in df.iterrows():
                     stage_idx, agent_idx = int(row['stage_idx']), int(row['agent_idx'])
@@ -281,13 +286,18 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
                         action_order_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = row['ans'] * cur_supp_relation
 
                     if question_type == 'supplier selection':
-                        supplier_name = node_id_name_map[int(row['ans'])]
-                        _, supp_stage_idx, _, supp_agent_idx = supplier_name.split('_')
-                        if supp_stage_idx == stage_idx + 1: # check if the supplier is in the next stage
-                            supp_relation = np.zeros(max_num_agents_per_stage, dtype=int)
-                            supp_relation[supp_agent_idx] = 1
-                            action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = supp_relation
-                        else:
+                        try:
+                            supplier_name = node_id_name_map[int(row['ans'])]
+                            _, supp_stage_idx, _, supp_agent_idx = supplier_name.split('_')
+                            supp_stage_idx = int(supp_stage_idx)
+                            supp_agent_idx = int(supp_agent_idx)
+                            if supp_stage_idx == stage_idx + 1: # check if the supplier is in the next stage
+                                supp_relation = np.zeros(max_num_agents_per_stage, dtype=int)
+                                supp_relation[supp_agent_idx] = 1
+                                action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = supp_relation
+                            else:
+                                action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = cur_supp_relation
+                        except:
                             action_sup_dict[f"stage_{stage_idx}_agent_{agent_idx}"] = cur_supp_relation
 
             # update env per stage
@@ -296,9 +306,9 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
     # Sort the action_order_dict by keys
     action_order_dict = dict(sorted(action_order_dict.items()))
     action_sup_dict = dict(sorted(action_sup_dict.items()))
-    print(action_order_dict)
+    print("action_order_dict", action_order_dict)
     print("\n")
-    print(action_sup_dict)
+    print("action_sup_dict", action_sup_dict)
     save_chat_history_to_file(data=total_chat_summary, save_path=config_name, t=period)
 
     # im_env.update_action_to_env(order_dict=action_order_dict, sup_dict=action_sup_dict, dem_dict=action_dem_dict, price_dict=action_price_dict)
@@ -306,6 +316,36 @@ def run_period_simulation(im_env, stage_agents: list, config_name: str, events: 
     env_json = visualize_state(env=im_env, t=im_env.period, save_prefix=config_name)
 
     return im_env, env_json
+
+
+def chat_with_llama_agents(im_env, query: dict, stage_agents: list):
+    # load model from stage_agents
+    model = stage_agents[0]
+    sc_mas_dataset = SupplyChainMASDataset(env=im_env)
+
+
+    with open("llama_mas_user_chat_history.csv", "a+") as f:
+        if f.tell() == 0:  # Check if the file is empty
+            f.write("id,pred,label,question,desc,stage_idx,agent_idx,question_type\n")  # Write header if file is empty
+        stage_idx = query['stage']
+        agent_idx = query['agent_idx']
+        mas_dataset = []
+        mas_dataset.append(sc_mas_dataset.__getitem__(stage_idx=stage_idx, agent_idx=agent_idx, question_type='user query', message=query['message']))
+        mas_test_loader = DataLoader(mas_dataset, batch_size=1, drop_last=False, pin_memory=True, shuffle=False, collate_fn=collate_fn)
+        for i, batch in enumerate(mas_test_loader):
+            df = pd.DataFrame({"id": [], "pred": [], "label": [], "question": [], "desc": [], 'stage_idx': [], 'agent_idx': [], 'question_type': []})
+            with torch.no_grad():
+                output = model.inference(batch, with_gnn=True) # turn off gnn encoding
+                # output['pred'] = stage_agent_id2name(output['pred'])
+                df = pd.concat([df, pd.DataFrame(output)], axis=0)
+                df['pred'] = df['pred'].apply(lambda x: stage_agent_id2name(x))
+                for _, row in df.iterrows():
+                    f.write(json.dumps(dict(row)) + "\n")
+
+        # df['ans'] = df['pred'].apply(lambda x: stage_agent_id2name(x))
+
+
+    return df.iloc[-1]['pred']
 
 
 

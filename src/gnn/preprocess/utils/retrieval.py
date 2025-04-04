@@ -70,8 +70,8 @@ def get_of_sub_df_edges(df_nodes: pd.DataFrame, df_edges: pd.DataFrame, target_n
     node_name_id_map = dict(zip(df_nodes['name'].tolist(), df_nodes['node_id'].tolist()))
     df_simp_edges = df_edges[(df_edges['source']==target_node)|(df_edges['target']==target_node)].reset_index(drop=True)
     # get sub df_edges that the edge attrs contains either request or delivery
-    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('order') | df_simp_edges['label'].str.contains('request') | df_simp_edges['label'].str.contains('deliverying')].reset_index(drop=True)
-
+    # df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('order') | df_simp_edges['label'].str.contains('request') | df_simp_edges['label'].str.contains('deliverying')].reset_index(drop=True)
+    df_simp_edges = df_simp_edges[df_simp_edges['label'].str.contains('deliverying')].reset_index(drop=True)
     df_simp_edges['src'] = df_simp_edges['source'].apply(lambda x: node_name_id_map[x])
     df_simp_edges['dst'] = df_simp_edges['target'].apply(lambda x: node_name_id_map[x])
     # change the column name "label to edge_attr"
@@ -163,7 +163,7 @@ def get_sub_df_nodes(df_nodes: pd.DataFrame, target_node: str, path: str=None):
             attr = (f"{df_nodes.loc[i, 'name']}: "
                     f"price: {df_nodes.loc[i, 'sale_price']}, "
                     f"production cost: {df_nodes.loc[i, 'prod_cost']}, "
-                    f"production capacity: {df_nodes.loc[i, 'prod_capacity']}, "
+                    # f"production capacity: {df_nodes.loc[i, 'prod_capacity']}, "
                     f"inventory: {df_nodes.loc[i, 'inventory']}, "
                     f"backlog: {df_nodes.loc[i, 'backlog']}, "
                     # f"upstream backlog: {df_nodes.loc[i, 'upstream_backlog']}",

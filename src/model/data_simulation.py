@@ -20,20 +20,24 @@ def generate_xy_locations(num_stages: int, num_agents_per_stage: int, config_nam
     return data
 
 def generate_lead_time(dist: dict, num_stages: int, num_agents_per_stage: int, config_name: str="test", save_data: bool=True):
-   
-    xy_locations = generate_xy_locations(num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=config_name, save_data=save_data)
-    data = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int)
-    for stage_id in range(num_stages-1):
-        for agent_id in range(num_agents_per_stage):
-            for supp_id in range(num_agents_per_stage):
-                distance = int(np.linalg.norm(xy_locations[stage_id, agent_id] - xy_locations[stage_id+1, supp_id]))
-                data[stage_id, agent_id, supp_id] = distance
+    
+    if os.path.exists(f"env/{config_name}/lead_time.npy") and os.path.exists(f"env/{config_name}/xy_locations.npy"):
+        lead_time = np.load(f"env/{config_name}/lead_time.npy")
+        xy_locations = np.load(f"env/{config_name}/xy_locations.npy")
+    else:
+        xy_locations = generate_xy_locations(num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, config_name=config_name, save_data=save_data)
+        data = np.zeros((num_stages, num_agents_per_stage, num_agents_per_stage), dtype=int)
+        for stage_id in range(num_stages-1):
+            for agent_id in range(num_agents_per_stage):
+                for supp_id in range(num_agents_per_stage):
+                    distance = int(np.linalg.norm(xy_locations[stage_id, agent_id] - xy_locations[stage_id+1, supp_id]))
+                    data[stage_id, agent_id, supp_id] = distance
 
-    data = np.maximum(data, 1)
-    if save_data:
-        save_array(data, f"env/{config_name}/lead_time.npy")
-        
-    return data
+        lead_time = np.maximum(data, 1)
+        if save_data:
+            save_array(lead_time, f"env/{config_name}/lead_time.npy")
+
+    return lead_time, xy_locations
 
 def generate_prod_capacity(dist: dict, num_data: int, config_name: str="test", save_data: bool=True):
     # To generate production capacity for each agent
@@ -127,24 +131,18 @@ def generate_sup_dem_relations(type: str, num_stages: int, num_agents_per_stage:
                     supply_relations[m][x][x] = 1
                 else:
                     supply_relations[m][x][x] = 1
-    elif type == "random":
-        for m in range(num_stages):
-            for x in range(max_num_agents_per_stage):
-                if m == 0:
-                    demand_relations[m][x][x] = 1
-                    suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
-                    supply_relations[m][x][suppliers_idx] = 1
-                elif m == num_stages-1:
-                    supply_relations[m][x][x] = 1
-                else:
-                    suppliers_idx = random_relations(n_cand=num_agents_per_stage, n_relation=num_suppliers)
-                    supply_relations[m][x][suppliers_idx] = 1
+    elif type == "random": # assume single supply relation
+        demand_relations[0] = np.eye(max_num_agents_per_stage)
+        supply_relations[-1] = np.eye(max_num_agents_per_stage)
+        for m in range(num_stages-1):
+            suppliers_idx = np.random.permutation(np.arange(num_agents_per_stage))
+            supply_relations[m][:num_agents_per_stage, :num_agents_per_stage] = np.eye(num_agents_per_stage)[suppliers_idx]
     else:
         raise AssertionError(f"{type} relation function is not implemented.")
     
     # Infer demand relations from supply relations
     demand_relations[1:, :, :] = np.transpose(supply_relations[:-1, :, :], (0, 2, 1)) 
-    
+
     return supply_relations, demand_relations
     
 
@@ -153,7 +151,7 @@ def generate_holding_costs(dist: dict, num_data: int, config_name: str="test", s
     if dist['dist'] == 'constant':
         mean = dist['mean']
         data = np.array([mean for _ in range(num_data)])
-    elif dist == "uniform":
+    elif dist['dist'] == "uniform":
         lb = dist['lb']
         ub = dist['ub']
         data = np.random.uniform(low=lb, high=ub, size=num_data)
@@ -228,7 +226,7 @@ class Demand_fn:
 
         # Whether there is a random noise on demand
         if dist['with_noise']:
-            self.noise = lambda x: np.random.poisson(lam=3)
+            self.noise = lambda x: np.random.poisson(lam=2)
         else: # poisson distribution of noise
             self.noise = lambda x: 0
 

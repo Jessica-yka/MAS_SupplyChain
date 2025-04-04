@@ -27,14 +27,42 @@ env_configs_list = {
         "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
         "init_inventory_dist": {'dist': "uniform", 'lb': 15, 'ub': 20}, # constant/uniform/etc
         "price_cost_dist": {'dist': 'uniform', 'lb': 1, 'ub': 8}, # constant/uniform/normal/etc
+        "lead_time_dist": {'dist': 'uniform', 'lb': 2, 'ub': 10}, # constant/uniform
+        "prod_capacity_dist": {'dist': 'uniform', 'lb': 20, 'ub': 40}, # constant/uniform("uniform", 25, 40)
+        "demand_fn": {"dist": "uniform_demand", "lb": 3, "ub": 6, "mean": 5, "trend": "", 'with_noise': True}, # constant/functional
+        "holding_costs_dist": {"dist": "uniform", "lb": 1, "ub": 3}, 
+        "backlog_costs_dist": {'dist': "uniform", "lb": 1, "ub": 3}, 
+        "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 
+        "llm_agents": [(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1), (2, 2), (2, 3), (3, 0), (3, 1), (3, 2), (3, 3)],
+        # "llm_agents": [(0,0), (0,1), (1,0), (2,0), (3,0)],
+        "enable_graph_change": True, 
+        "enable_price_change": False, 
+        "state_format": "base", 
+        "env_no_backlog": False, 
+        "emergent_events": {}, 
+
+    },
+    "inference_only": {
+        "config_name": "inference_only",
+        "sup_dem_relation_type": "random", # random/fixed
+        "num_init_suppliers": 1,
+        "num_init_customers": 1,
+        "num_stages": 4,
+        "num_agents_per_stage": 4, # >= 2
+        "max_num_agents_per_stage": 4, # can add new agents in the middle way
+        "num_periods": 30,
+        "stage_names": ['retailer', 'wholesaler', 'distributor', 'manufacturer'],
+        "init_inventory_dist": {'dist': "uniform", 'lb': 15, 'ub': 20}, # constant/uniform/etc
+        "price_cost_dist": {'dist': 'uniform', 'lb': 1, 'ub': 8}, # constant/uniform/normal/etc
         "lead_time_dist": {'dist': 'uniform', 'lb': 2, 'ub': 15}, # constant/uniform
-        "prod_capacity_dist": {'dist': 'uniform', 'lb': 25, 'ub': 40}, # constant/uniform("uniform", 25, 40)
+        "prod_capacity_dist": {'dist': 'uniform', 'lb': 20, 'ub': 40}, # constant/uniform("uniform", 25, 40)
         "demand_fn": {"dist": "uniform_demand", "lb": 3, "ub": 6, "mean": 5, "trend": "", 'with_noise': True}, # constant/functional
         "holding_costs_dist": {"dist": "constant", "mean": 3}, 
         "backlog_costs_dist": {'dist': "constant", "mean": 3}, 
         "profit_rate_dist": {"dist": "uniform", "lb": 0, "ub": 1}, 
-        "llm_agents": [(0, 0), (0, 1), (1, 0), (1, 1), (2, 0), (2, 1), (3, 0), (3, 1)],
+        "llm_agents": [(0, 0), (0, 1), (0, 2), (0, 3), (1, 0), (1, 1), (1, 2), (1, 3), (2, 0), (2, 1), (2, 2), (2, 3), (3, 0), (3, 1), (3, 2), (3, 3)],
         # "llm_agents": [(0,0), (0,1), (1,0), (2,0), (3,0)],
+        # "llm_agents": [(2, 2)],
         "enable_graph_change": True, 
         "enable_price_change": False, 
         "state_format": "base", 
@@ -54,7 +82,7 @@ def get_env_configs(env_configs: dict):
 
     # crate the dir to store the env setup
     os.makedirs(f"env/{env_config_name}", exist_ok=True)
-    clear_dir(f"env/{env_config_name}")
+    # clear_dir(f"env/{env_config_name}")
     
 
     save_dict_to_json(data=env_configs, save_path=f"env/{env_config_name}/config.json")
@@ -66,6 +94,8 @@ def get_env_configs(env_configs: dict):
     num_init_suppliers = env_configs["num_init_suppliers"]
 
 
+    np.random.seed(42)  # Set a fixed seed for reproducibility
+
     supply_relations, demand_relations = \
         generate_sup_dem_relations(type=env_configs["sup_dem_relation_type"], num_stages=num_stages, num_agents_per_stage=num_agents_per_stage, \
                                    max_num_agents_per_stage=max_num_agents_per_stage, num_suppliers=env_configs["num_init_suppliers"], num_customers=env_configs["num_init_customers"])
@@ -76,7 +106,7 @@ def get_env_configs(env_configs: dict):
         generate_holding_costs(dist=env_configs["holding_costs_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
     backlog_costs = \
         generate_backlog_costs(dist=env_configs["backlog_costs_dist"], num_data=num_total_agents, config_name=env_configs["config_name"])
-    lead_times = \
+    lead_times, xy_locations = \
         generate_lead_time(dist=env_configs["lead_time_dist"], num_stages=num_stages, num_agents_per_stage=max_num_agents_per_stage, config_name=env_configs["config_name"])
     prod_capacities = \
         generate_prod_capacity(dist=env_configs['prod_capacity_dist'], num_data=num_total_agents, config_name=env_configs["config_name"])
@@ -125,6 +155,7 @@ def get_env_configs(env_configs: dict):
         "enable_graph_change": enable_graph_change,
         "enable_price_change": enable_price_change, 
         "emergent_events": emergent_events,
+        "locations": xy_locations,
     }
     
 

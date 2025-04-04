@@ -197,7 +197,7 @@ def visualize_state(env, t: int, save_prefix: str):
     max_num_agents_per_stage = env.max_num_agents_per_stage
     lt_max = env.max_lead_time
     save_path = f'results/{save_prefix}/'
-    xy_locations = np.load(f'env/{save_prefix}/xy_locations.npy')
+    # xy_locations = np.load(f'env/{save_prefix}/xy_locations.npy')
 
     df = pd.DataFrame({
         "stage": {},
@@ -221,6 +221,7 @@ def visualize_state(env, t: int, save_prefix: str):
         'running_status': {},
         "demand": {},
         "location": {},
+        "supply_relation_summary": {},
     })
     for stage in range(num_stages):
         for agent in range(max_num_agents_per_stage):
@@ -230,6 +231,23 @@ def visualize_state(env, t: int, save_prefix: str):
                 demand = env.demands[agent, env.period]
             else:
                 demand = 0
+            if stage < num_stages-1: 
+                num_avail_upstream = sum(env.running_agents[stage+1]>=0)
+            else:
+                num_avail_upstream = sum(env.running_agents[-1]>=0) # num of supplier == num of manufacturer
+            supply_relation_summary = np.zeros(num_avail_upstream, dtype=int)
+            next_supplier = np.argmax(state_dict[f'stage_{stage}_agent_{agent}'][9]) # supply_relation
+            print("next supplier is", next_supplier)
+            supply_relation_summary[next_supplier] = 2
+            cur_supplier = [i for i in range(num_avail_upstream) if state_dict[f'stage_{stage}_agent_{agent}'][15][i]==1] # order
+            print("current supplier is", cur_supplier)
+            supply_relation_summary[cur_supplier] = 1
+            total_deliveries = np.sum(state_dict[f'stage_{stage}_agent_{agent}'][12], axis=-1)
+            cur_delivery = [i for i in range(num_avail_upstream) if total_deliveries[i]> 0] # agents that have deliveries on the way
+            print("cur delivery is", cur_delivery)
+            supply_relation_summary[cur_delivery] = 1
+            print("supply relation summary", supply_relation_summary)
+
             df = pd.concat([df, pd.DataFrame({
                 'stage': [stage], 
                 "agent_idx": [agent],
@@ -251,7 +269,8 @@ def visualize_state(env, t: int, save_prefix: str):
                 "orders": [state_dict[f'stage_{stage}_agent_{agent}'][15]],
                 'profits': [state_dict[f'stage_{stage}_agent_{agent}'][16]],
                 "demand": [demand],
-                "location": [xy_locations[stage][agent].tolist()]
+                "location": [state_dict[f"stage_{stage}_agent_{agent}"][17]],
+                "supply_relation_summary": [supply_relation_summary.tolist()], 
                 })], ignore_index=True)
     
     df = df.groupby(by=['stage', 'agent_idx']).apply(lambda x: x).reset_index(drop=True)
@@ -402,3 +421,25 @@ def update_sup_action(sup_action: list, rm_match: str, add_match: str):
     
     return sup_action
     
+def stage_agent_id2name(txt: str):
+    """
+    Create a mapping of agent IDs to their names for different stages.
+    
+    Returns:
+        dict: A dictionary mapping agent IDs to their names.
+    """
+    txt = txt.replace("stage_0_agent_", "retailer_")
+    txt = txt.replace("stage_1_agent_", "wholesaler_")
+    txt = txt.replace("stage_2_agent_", "distributor_")
+    txt = txt.replace("stage_3_agent_", "manufacturer_")
+
+    return txt 
+   
+def name2stage_agent_id(txt: str):
+
+    txt = txt.replace("retailer ", "stage_0_agent_")
+    txt = txt.replace("wholesaler ", "stage_1_agent_")
+    txt = txt.replace("distributor ", "stage_2_agent_")
+    txt = txt.replace("manufacturer ", "stage_3_agent_")
+
+    return txt

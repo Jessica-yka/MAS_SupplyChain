@@ -18,7 +18,7 @@ from openai import AzureOpenAI
 from src.model.gpt_mas_model import create_agents as create_gpt_agents
 from src.model.gpt_mas_model import run_period_simulation as run_gpt_period_simulation
 from src.model.llama_mas_model import create_agents as create_llama_agents
-from src.model.llama_mas_model import run_period_simulation as run_llama_period_simulation
+from src.model.llama_mas_model import run_period_simulation as run_llama_period_simulation, chat_with_llama_agents
 from src.model.utils.utils import get_demand_description, get_state_description, clear_dir, visualize_state, create_action_dicts
 from src.model.env import load_env_attributes, save_env_attributes, reverse_env_to_t
 import argparse
@@ -31,6 +31,7 @@ parser.add_argument('--cur_period', type=int, default=None, help='Current Period
 
 np.random.seed(42)
 
+# ENV_CONFIG_NAME = "inference_only"
 ENV_CONFIG_NAME = "graph_4_4"
 LLM_AGENT_NAME = "llama"
 
@@ -68,7 +69,11 @@ def period_simulation_framework(env_json=None, cur_period: int=0, events=[]):
         clear_dir(f"results/{ENV_CONFIG_NAME}/img_results")
         clear_dir(f"results/{ENV_CONFIG_NAME}/df_results")
         clear_dir(f"results/{ENV_CONFIG_NAME}/chat_results")
-        clear_dir(f"env/{ENV_CONFIG_NAME}")
+        if os.path.exists("testing_llama_mas_question_formulation.csv"):
+            os.remove("testing_llama_mas_question_formulation.csv")
+        # clear_dir(f"env/{ENV_CONFIG_NAME}")
+        if os.path.exists(f"llama_mas_user_chat_history.csv"):
+            os.remove(f"llama_mas_user_chat_history.csv")
 
     # setup the environment
     im_env, env_config = create_supply_chain_environment(env_json=env_json, cur_period=cur_period)
@@ -97,6 +102,21 @@ def period_simulation_framework(env_json=None, cur_period: int=0, events=[]):
 
     return env_json
 
+def user_conversation_with_llama_agents(query: list, cur_period: int=0):
+    # read env from json
+    env_json_path = f"results/{ENV_CONFIG_NAME}/json_results/env_period_{cur_period}.json"
+    if os.path.exists(env_json_path):
+        with open(env_json_path, 'r') as f:
+            env_json = json.load(f)
+    else:
+        raise FileNotFoundError(f"Environment JSON file not found: {env_json_path}")
+    # setup the environment
+    im_env, env_config = create_supply_chain_environment(env_json=env_json, cur_period=cur_period)
+    # create the agents
+    stage_agents = create_llama_agents(env_config["num_stages"], env_config["max_num_agents_per_stage"])
+    ans = chat_with_llama_agents(im_env=im_env, stage_agents=stage_agents, query=query)
+
+    return ans
 
 
 if __name__ == "__main__":
@@ -110,5 +130,9 @@ if __name__ == "__main__":
         env_json = None
 
     cur_period = args.cur_period
-    events = [{'id': 'event-1742998185720', 'type': 'Advances in operation robotics', 'effect': 'Positive', 'nodeStage': 0, 'nodeIndex': 0, 'companyType': 'Retailer'}]
+    events = []
+    # events = [{'id': 'event-1742998185720', 'type': 'Advances in operation robotics', 'effect': 'Positive', 'nodeStage': 0, 'nodeIndex': 0, 'companyType': 'Retailer'}]
+    # query = [{"stage": 0, "agent_idx": 0, "message": "Tell me your reasoning process when placing the order."},]
     period_simulation_framework(env_json=env_json, cur_period=cur_period, events=events)
+    # ans = user_conversation_with_llama_agents(cur_period=cur_period, query=query)
+    # print(ans)

@@ -10,9 +10,11 @@ from src.gnn.preprocess.lm_modeling import load_model, load_text2embedding
 from src.gnn.preprocess.graph_qa_data_generation import build_supplier_graph
 from src.gnn.preprocess.utils.retrieval import get_sub_df_nodes, get_sub_df_edges
 from src.gnn.preprocess.utils.retrieval import get_demand_sub_df_edges, get_event_sub_df_edges, get_lt_sub_df_edges, get_price_sub_df_edges, get_of_sub_df_edges
+from src.model.utils.utils import name2stage_agent_id
 import os
 from tqdm import tqdm
 from src.gnn.preprocess.events import events
+import csv
 
 
 PATH = 'src/gnn/gnn_dataset/large_graph_test/test_data'
@@ -134,32 +136,6 @@ class SupplyChainMASTestDataset(Dataset):
 
         return {"test": range(self.num_data)}
 
-    def get_downstream_question(self, id, price_out=None, lead_time_out=None, event_put=None, supplier_out=None):
-        
-        # price_agent = price_out['pred']
-        # lead_time_agent = lead_time_out['pred']
-        # prompt = (f"Context: you think {price_agent} is the upstream agent with the lowest price. You think {lead_time_agent} is the upstream agent with the shortest lead time. Given this information, answer the following questions:\n\n"
-        #           f"Question: Who you would choose as your supplier in the next round? Please consider the price and lead time of the upstream agents. Answer the node id of your choice'.\n\n")
-        
-        intro = price_out['question'][0].split('. ')[0]
-        prompt = (intro + '. '
-                  f"Question: Considering the price and lead time of the upstream agents, who you would choose as your supplier in the next round? Answer the node id of your choice. "
-                  f"{self.cot}\n\n"
-                  )
-        label = None
-        data_index = lead_time_out['id'][0]
-        graph = torch.load(f'{cached_graph}/{data_index}.pt')
-        desc = open(f'{cached_desc}/{data_index}.txt', 'r').read()
-        print(prompt)
-        return {
-            'id': id,
-            "price_id": price_out['id'],
-            "lead_time_id": lead_time_out['id'],
-            'label': label,
-            'desc': desc,
-            'graph': graph,
-            'question': prompt
-        }
 
 # the dataloader used in the MAS system) (IMPORTANT)
 class SupplyChainMASDataset(Dataset):
@@ -252,7 +228,7 @@ class SupplyChainMASDataset(Dataset):
         # create orders from the downstream agents
         # TODO: need to update demand
         if target_stage_idx == 0:
-            num_unit = env['demands'][t]
+            num_unit = env['demands'][target_agent_idx, t]
             df_edge.loc[edge_idx, ["source", "target", "label", "type", "aspect"]] = \
                     ['Customers', f"stage_{target_stage_idx}_agent_{target_agent_idx}", f"order {num_unit} units of product at period {t} from", "", []]
             edge_idx += 1
@@ -339,19 +315,38 @@ class SupplyChainMASDataset(Dataset):
         node_id_name_map = dict(zip(df_sub_nodes['node_id'].tolist(), df_sub_nodes['name'].tolist()))
         if question_type == "order placement":
             # only retrieve the relation with downstream agents from the df_edges
+            df_lt_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
             df_demand_edges = get_demand_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
-            df_lt_edges = get_lt_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+            # df_lt_edges = get_lt_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
             df_sub_edges = pd.concat([df_demand_edges, df_lt_edges], axis=0)
-            
         elif question_type == "supplier selection":
             # only retrieve the relations that are 1.upstream agents from the df_edges, 2.the supplier relations, and 3.the event
-            df_event_edges = get_event_sub_df_edges(G=G, df_edges=df_edges, df_nodes=df_nodes, target_node=target_node)
+            df_event_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+            df_price_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+            df_of_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+            for edge in G.edges(data=True):
+                if 'affects' in edge[2].get('label', ''):       
+                    df_event_edges = get_event_sub_df_edges(G=G, df_edges=df_edges, df_nodes=df_nodes, target_node=target_node)
+            # df_event_edges = get_event_sub_df_edges(G=G, df_edges=df_edges, df_nodes=df_nodes, target_node=target_node)
             df_price_edges = get_price_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+            df_lt_edges = get_lt_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
             df_of_edges = get_of_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
-            df_sub_edges = pd.concat([df_event_edges, df_price_edges, df_of_edges], axis=0)
-   
+            df_sub_edges = pd.concat([df_event_edges, df_price_edges, df_lt_edges, df_of_edges], axis=0)
+        elif question_type == "user query":
+            # only retrieve the relations that are 1.upstream agents from the df_edges, 2.the supplier relations, and 3.the event
+            df_event_edges = pd.DataFrame(columns=['src', 'edge_attr', 'dst', 'src_name', 'dst_name'])
+            df_price_edges = get_price_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+            df_lt_edges = get_lt_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+            df_of_edges = get_of_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+            df_demand_edges = get_demand_sub_df_edges(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node)
+            df_sub_edges = pd.concat([df_event_edges, df_price_edges, df_lt_edges, df_of_edges], axis=0)
+        else:
+            raise ValueError(f"Unknown question type: {question_type}")
+        
+        df_sub_edges['src'] = df_sub_edges['src'].astype(int)
+        df_sub_edges['dst'] = df_sub_edges['dst'].astype(int)
         # Remove duplicate edges in df_sub_edges
-        df_sub_edges = df_sub_edges.drop_duplicates(subset=['src', 'edge_attr', 'dst', 'src_name', 'dst_name']).reset_index(drop=True)
+        df_sub_edges = df_sub_edges.drop_duplicates(subset=['src', 'edge_attr', 'dst']).reset_index(drop=True)
 
         return df_sub_nodes, df_sub_edges, node_id_name_map
 
@@ -376,26 +371,68 @@ class SupplyChainMASDataset(Dataset):
 
         df_nodes = self.convert_env_to_node_df(env=env, event_dict=self.event_dict)
         df_edges = self.convert_env_to_edge_df(env=env, event_dict=self.event_dict, target_stage_idx=target_stage_idx, target_agent_idx=target_agent_idx) # TODO: need to write an aggregated one. To figure out the replacement of event_dict
+        df_nodes.to_csv(f"df_nodes_stage_{target_stage_idx}_agent_{target_agent_idx}.csv", index=False)
         df_edges.to_csv(f"df_edges_stage_{target_stage_idx}_agent_{target_agent_idx}.csv", index=False)
         G = build_supplier_graph(df_edges=df_edges, df_nodes=df_nodes)
         df_nodes, df_edges, node_id_name_map = self.retrieve_subgraph(df_nodes=df_nodes, df_edges=df_edges, target_node=target_node, G=G, question_type=question_type)
         graph = self.generate_text_embedding(nodes=df_nodes, edges=df_edges)
         desc = df_nodes[['node_id', 'node_attr']].to_csv(index=False)+'\n'+df_edges[['src', 'edge_attr', 'dst']].to_csv(index=False)
+        with open(f"desc_stage_{target_stage_idx}_agent_{target_agent_idx}.txt", "w") as file:
+            file.write(desc)
 
         return desc, graph, node_id_name_map
     
 
-    def __getitem__(self, stage_idx: int, agent_idx: int, question_type: str):
+    def get_action_desc(self, target_stage_idx: int, target_agent_idx: int):
+
+        env = self.retrieve_env(self.env)
+        t = env['t']
+        orders = env['orders'][target_stage_idx][target_agent_idx]
+        num_orders = sum(orders[:, t])
+        supp_idx = np.argmax(orders[:, t])
+        if target_stage_idx < self.num_stages-1:
+            supp_name = f"stage_{target_stage_idx+1}_agent_{supp_idx}"
+        else:
+            supp_name =  ""
+        action_desc = (f"You just made an order of {num_orders} unit products to your supplier {supp_name} at period {t}. ")
+
+        return action_desc
+    
+    def get_chat_history(self, target_stage_idx: int, target_agent_idx: int):
+        chat_history = []
+        try:
+            with open('llama_mas_user_chat_history.csv', 'r') as file:
+                reader = csv.DictReader(file)
+            for row in reader:
+                if int(row['stage_idx']) == target_stage_idx and int(row['agent_idx']) == target_agent_idx:
+                    chat_history.append(f"User: {row['message']}")
+                    chat_history.append(f"Assistant: {row['answer']}")
+        except FileNotFoundError:
+            print("Chat history file not found.")
+
+        return "\n".join(chat_history)
+    
+
+    def __getitem__(self, stage_idx: int, agent_idx: int, question_type: str, message: str=None):
 
         target_node = f"stage_{stage_idx}_agent_{agent_idx}"
-        desc, graph, node_id_name_map = self.preprocess(target_stage_idx=stage_idx, target_agent_idx=agent_idx, question_type=question_type)
+        t = self.env.period
+        graph_desc, graph, node_id_name_map = self.preprocess(target_stage_idx=stage_idx, target_agent_idx=agent_idx, question_type=question_type)
+        action_desc = self.get_action_desc(target_stage_idx=stage_idx, target_agent_idx=agent_idx)
         if question_type == "order placement":
-            prompt = (f"You are {target_node} in the supply chain at round . Given the current state of the supply chain, answer the following question:\n\n"
-                    f"Question: Considering the your inventory level, orders/demand from the downstream customers and lead times to the suppliers, how many orders would you like to place to your supplier in this round? Answer in the form of a number. "
-            )
+            prompt = (f"You are {target_node} in the supply chain at round {t}. Based on the provided supply chain graph, answer the following question:\n\n"
+                    f"Question: Considering the inventory level and the requested order, how many orders would you like to place to your supplier in this round? Answer in the form of a number. "
+                    )
         elif question_type == "supplier selection":
-            prompt = (f"You are {target_node} in the supply chain. Given the current state of the supply chain, answer the following question:\n\n"
-                    f"Question: Considering the price, lead time and order fulfillment, who you would choose as your supplier in the next round? Answer the node id of your choice."
+            prompt = (f"You are {target_node} in the supply chain at round {t}. Based on the provided supply chain graph, answer the following question:\n\n"
+                    f"Question: Considering the upstream agents with low price, short lead time or high order fulfillment, who you would choose as your supplier in the next round? Answer the node id of your choice."
+                    # f"which of the upstream agents at stage {stage_idx+1} has the shortest lead time? Answer with the node id, e.g. 15."
+                    )
+        elif question_type == "user query":
+            message = name2stage_agent_id(message)
+            prompt = (f"User: You are {target_node} in the supply chain at round {t}. {action_desc}"
+                      "Given the current state of the supply chain and your past decisions, answer the following question:\n\n"
+                      f"Question: {message}"
                     )
         # print(desc)
         self.index += 1
@@ -404,7 +441,7 @@ class SupplyChainMASDataset(Dataset):
             'label': None,
             'stage_idx': stage_idx,
             'agent_idx': agent_idx,
-            'desc': desc,
+            'desc': graph_desc,
             'graph': graph,
             'question': prompt,
             'question_type': question_type,

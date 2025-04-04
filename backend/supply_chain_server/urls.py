@@ -89,6 +89,11 @@ urlpatterns = [
         'document_root': settings.BASE_DIR / 'dist/locales'
     }),
     
+    # 添加字体文件路由
+    re_path(r'^fonts/(?P<path>.*)$', serve, {
+        'document_root': settings.BASE_DIR / 'dist/fonts'
+    }),
+    
     # 确保这些路由在通配符路由之前
     path('', TemplateView.as_view(template_name='index.html')),
     re_path(r'^.*$', TemplateView.as_view(template_name='index.html')),

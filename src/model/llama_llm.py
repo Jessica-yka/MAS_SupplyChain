@@ -55,9 +55,10 @@ class LLM(torch.nn.Module):
         model = AutoModelForCausalLM.from_pretrained(
             args.llm_model_path,
             quantization_config=bnb_config,  # Pass the BitsAndBytesConfig object
-            device_map="auto",              # Automatically map the model to GPU(s)
+            # device_map="auto",              # Automatically map the model to GPU(s)
             max_memory=kwargs["max_memory"],  # Set the maximum memory for each device
             revision=kwargs["revision"],  # Use the main revision of the model
+            low_cpu_mem_usage=True,  # Use less CPU memory
         )
         self.prompting_tech = args.prompting_tech
 
@@ -202,7 +203,11 @@ class LLM(torch.nn.Module):
                 'pred': pred,
                 'label': samples['label'],
                 'question': samples['question'],
-                'desc': samples['desc'], }
+                'desc': samples['desc'], 
+                'stage_idx': samples.get('stage_idx', None),
+                'agent_idx': samples.get('agent_idx', None),
+                'question_type': samples.get('question_type', None),
+                }
 
     def print_trainable_params(self):
         trainable_params = 0

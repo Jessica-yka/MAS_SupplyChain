@@ -31,7 +31,7 @@ np.random.seed(42)
 # ## Creating the Environment
 
 # %%req orders 
-env_config_name = "graph_4_4"
+env_config_name = "graph_4_4_gpt"
 # create the dir to store the results
 os.makedirs(f"results/{env_config_name}", exist_ok=True)
 clear_dir(f"results/{env_config_name}")

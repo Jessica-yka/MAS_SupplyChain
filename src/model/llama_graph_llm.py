@@ -187,7 +187,7 @@ class GraphLLM(torch.nn.Module):
         return outputs.loss
 
 
-    def inference(self, samples):
+    def inference(self, samples, with_gnn=True):
 
         # encode description and questions
         questions = self.tokenizer(samples["question"], add_special_tokens=False)
@@ -209,7 +209,10 @@ class GraphLLM(torch.nn.Module):
             # Add bos & eos token
             input_ids = descriptions.input_ids[i][:self.max_txt_len] + questions.input_ids[i] + eos_user_tokens.input_ids
             inputs_embeds = self.word_embedding(torch.tensor(input_ids).to(self.model.device))
-            inputs_embeds = torch.cat([bos_embeds, graph_embeds[i].unsqueeze(0), inputs_embeds], dim=0)
+            if with_gnn:
+                inputs_embeds = torch.cat([bos_embeds, graph_embeds[i].unsqueeze(0), inputs_embeds], dim=0)
+            else:
+                inputs_embeds = torch.cat([bos_embeds, inputs_embeds], dim=0)
             batch_inputs_embeds.append(inputs_embeds)
             batch_attention_mask.append([1] * inputs_embeds.shape[0])
 
